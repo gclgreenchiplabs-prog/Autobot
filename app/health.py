@@ -32,6 +32,7 @@ class HealthMonitor:
 
     def snapshot(self) -> Dict[str, Any]:
         self.last_heartbeat = datetime.now(timezone.utc).isoformat()
+        universe_status = self.state_store.get("universe_status") or {}
         payload = {
             "status": self.status,
             "startup_time": self.startup_time,
@@ -43,6 +44,12 @@ class HealthMonitor:
             "configured_primary_broker": "fyers",
             "active_execution_broker": "paper" if self.settings.is_paper_mode else self.settings.primary_broker,
             "standby_broker": "dhan",
+            "universe": {
+                "ready": universe_status.get("ready", False),
+                "conflict_count": universe_status.get("conflict_count", 0),
+                "last_import_time": universe_status.get("last_import_time"),
+                "import_source": universe_status.get("import_source", "NOT_CONFIGURED"),
+            },
         }
         self.state_store.set("health", payload)
         return payload

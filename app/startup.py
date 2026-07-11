@@ -39,10 +39,11 @@ class ApplicationStartupManager:
             self.container.wire_runtime()
         except ValueError:
             pass
+        self.container.notification_service.start()
+        self.container.instrument_service.start()
         self.container.health_monitor.record_startup()
         self.container.scheduler.start()
         self.container.task_manager.start()
-        self.container.notification_service.start()
         self.container.status_scheduler.start()
         self.started = True
 

@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi import APIRouter, Body, HTTPException, Query, Request
 
-from app.api.schemas import HealthResponse, StateResponse
+from app.api.schemas import HealthResponse, InstrumentImportRequest, StateResponse
 from app.container import AppContainer
 
 router = APIRouter()
@@ -24,6 +24,14 @@ def _get_notification_service(request: Request) -> Any:
 
 def _get_telemetry_service(request: Request) -> Any:
     return request.app.state.telemetry_service
+
+
+def _get_instrument_service(request: Request) -> Any:
+    return request.app.state.instrument_service
+
+
+def _get_market_data_repository(request: Request) -> Any:
+    return request.app.state.market_data_repository
 
 
 def _broker_state(container: AppContainer) -> Dict[str, Any]:
@@ -56,7 +64,7 @@ def health(request: Request) -> HealthResponse:
         configured_primary_broker=broker_state["configured_primary_broker"],
         active_execution_broker=broker_state["active_execution_broker"],
         standby_broker=broker_state["standby_broker"],
-        controls=["start", "stop", "pause", "resume", "scan", "kill-switch", "send-status-now"],
+        controls=["start", "stop", "pause", "resume", "scan", "kill-switch", "send-status-now", "import-instruments"],
     )
 
 
@@ -94,6 +102,7 @@ def readiness(request: Request) -> Dict[str, Any]:
         "active_execution_broker": broker_state["active_execution_broker"],
         "standby_broker": broker_state["standby_broker"],
         "health": container.health_monitor.snapshot(),
+        "universe": container.state_store.get("universe_status") or {},
     }
 
 
@@ -126,6 +135,125 @@ def positions(request: Request) -> List[Dict[str, Any]]:
 @router.get("/api/events")
 def events(request: Request) -> List[Dict[str, Any]]:
     return _get_container(request).event_bus.list_events()
+
+
+@router.get("/api/companies")
+def companies(
+    request: Request,
+    exchange: Optional[str] = None,
+    active: Optional[bool] = None,
+    symbol: Optional[str] = None,
+    isin: Optional[str] = None,
+    limit: int = Query(default=100, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
+) -> List[Dict[str, Any]]:
+    return _get_instrument_service(request).list_companies(
+        exchange=exchange,
+        active=active,
+        symbol=symbol,
+        isin=isin,
+        limit=limit,
+        offset=offset,
+    )
+
+
+@router.get("/api/companies/{company_id}")
+def company_by_id(request: Request, company_id: str) -> Dict[str, Any]:
+    company = _get_instrument_service(request).get_company(company_id)
+    if company is None:
+        raise HTTPException(status_code=404, detail="company not found")
+    return company
+
+
+@router.get("/api/instruments")
+def instruments(
+    request: Request,
+    exchange: Optional[str] = None,
+    segment: Optional[str] = None,
+    instrument_type: Optional[str] = None,
+    fno_eligible: Optional[bool] = None,
+    active: Optional[bool] = None,
+    symbol: Optional[str] = None,
+    isin: Optional[str] = None,
+    broker: Optional[str] = None,
+    limit: int = Query(default=100, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
+) -> List[Dict[str, Any]]:
+    return _get_instrument_service(request).list_instruments(
+        exchange=exchange,
+        segment=segment,
+        instrument_type=instrument_type,
+        fno_eligible=fno_eligible,
+        active=active,
+        symbol=symbol,
+        isin=isin,
+        broker=broker,
+        limit=limit,
+        offset=offset,
+    )
+
+
+@router.get("/api/instruments/{instrument_id}")
+def instrument_by_id(request: Request, instrument_id: str) -> Dict[str, Any]:
+    instrument = _get_instrument_service(request).get_instrument(instrument_id)
+    if instrument is None:
+        raise HTTPException(status_code=404, detail="instrument not found")
+    return instrument
+
+
+@router.get("/api/universe/status")
+def universe_status(request: Request) -> Dict[str, Any]:
+    return _get_instrument_service(request).universe_status()
+
+
+@router.get("/api/universe/conflicts")
+def universe_conflicts(request: Request) -> List[Dict[str, Any]]:
+    return _get_instrument_service(request).repository.list_conflicts()
+
+
+@router.get("/api/universe/fno")
+def universe_fno(request: Request, limit: int = Query(default=100, ge=1, le=500), offset: int = Query(default=0, ge=0)) -> List[Dict[str, Any]]:
+    return _get_instrument_service(request).list_instruments(fno_eligible=True, limit=limit, offset=offset)
+
+
+@router.get("/api/universe/nse")
+def universe_nse(request: Request, limit: int = Query(default=100, ge=1, le=500), offset: int = Query(default=0, ge=0)) -> List[Dict[str, Any]]:
+    return _get_instrument_service(request).list_instruments(exchange="NSE", limit=limit, offset=offset)
+
+
+@router.get("/api/universe/bse")
+def universe_bse(request: Request, limit: int = Query(default=100, ge=1, le=500), offset: int = Query(default=0, ge=0)) -> List[Dict[str, Any]]:
+    return _get_instrument_service(request).list_instruments(exchange="BSE", limit=limit, offset=offset)
+
+
+@router.get("/api/market-data/quality")
+def market_data_quality(
+    request: Request,
+    quality_class: Optional[str] = None,
+    limit: int = Query(default=100, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
+) -> List[Dict[str, Any]]:
+    return _get_market_data_repository(request).list_quality(quality_class=quality_class, limit=limit, offset=offset)
+
+
+@router.get("/api/market-data/stale")
+def market_data_stale(request: Request, limit: int = Query(default=100, ge=1, le=500), offset: int = Query(default=0, ge=0)) -> List[Dict[str, Any]]:
+    return _get_market_data_repository(request).list_staleness(limit=limit, offset=offset)
+
+
+@router.get("/api/market-data/liquidity")
+def market_data_liquidity(
+    request: Request,
+    liquidity_class: Optional[str] = None,
+    limit: int = Query(default=100, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
+) -> List[Dict[str, Any]]:
+    return _get_market_data_repository(request).list_liquidity(liquidity_class=liquidity_class, limit=limit, offset=offset)
+
+
+@router.get("/api/scanner/candidates")
+def scanner_candidates(request: Request) -> List[Dict[str, Any]]:
+    return _get_instrument_service(request).repository.list_candidates()
 
 
 @router.get("/api/notifications")
@@ -229,3 +357,9 @@ def control_send_status_now(request: Request) -> Dict[str, Any]:
     if notification is None:
         raise HTTPException(status_code=503, detail="status report was not generated")
     return notification
+
+
+@router.post("/api/control/import-instruments")
+def control_import_instruments(request: Request, payload: Optional[InstrumentImportRequest] = Body(default=None)) -> Dict[str, Any]:
+    body = payload.model_dump(exclude_none=True) if payload is not None else {}
+    return _get_instrument_service(request).import_instruments(body)

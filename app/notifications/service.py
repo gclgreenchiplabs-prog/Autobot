@@ -239,6 +239,8 @@ class NotificationService:
         raw_type = str(event.get("event_type") or "").strip().upper()
         if raw_type in {member.value for member in NotificationType}:
             return raw_type
+        if raw_type.startswith(("INSTRUMENT_", "DATA_QUALITY_", "QUOTE_", "LIQUIDITY_", "SPREAD_", "UNIVERSE_")):
+            return raw_type
         if "CORPORATE" in raw_type:
             return NotificationType.CORPORATE_EVENT_DETECTED.value
         if "NEWS" in raw_type:

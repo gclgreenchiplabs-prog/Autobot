@@ -7,7 +7,6 @@
   --accent: #44c4ff;
   --accent-strong: #ffcf5c;
   --danger: #ff6b6b;
-  --success: #5fe1a5;
 }
 
 * {
@@ -25,7 +24,7 @@ body {
 }
 
 .shell {
-  max-width: 1240px;
+  max-width: 1320px;
   margin: 0 auto;
   padding: 24px;
 }
@@ -56,7 +55,7 @@ h1, h2, p {
 
 .subtitle {
   color: var(--muted);
-  max-width: 50ch;
+  max-width: 60ch;
   margin-bottom: 0;
 }
 
@@ -78,7 +77,7 @@ h1, h2, p {
 .hero-status {
   color: var(--muted);
   text-align: right;
-  max-width: 220px;
+  max-width: 280px;
 }
 
 .controls {
@@ -130,6 +129,10 @@ button.danger {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.compact-grid {
+  margin-top: 12px;
+}
+
 .kv-row {
   display: flex;
   justify-content: space-between;
@@ -138,12 +141,12 @@ button.danger {
   border-bottom: 1px solid rgba(158, 182, 204, 0.12);
 }
 
-.stacked-list {
+.stacked-list, .table-stack {
   display: grid;
   gap: 12px;
 }
 
-.item-card {
+.item-card, .table-row {
   padding: 14px;
   border-radius: 18px;
   background: rgba(6, 18, 31, 0.76);
@@ -163,6 +166,20 @@ button.danger {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
   margin-bottom: 10px;
+}
+
+.table-row {
+  display: grid;
+  gap: 8px;
+}
+
+.table-row div {
+  color: var(--muted);
+}
+
+.table-row strong {
+  color: var(--text);
+  margin-right: 8px;
 }
 
 .empty-state {

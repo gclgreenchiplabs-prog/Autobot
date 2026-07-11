@@ -12,7 +12,7 @@
         <div>
           <p class="eyebrow">Unified Ops Console</p>
           <h1>MARKET MOVE AI</h1>
-          <p class="subtitle">Notifications, telemetry, and runtime state from one canonical FastAPI app.</p>
+          <p class="subtitle">Canonical app, notification pipeline, and fixture-driven NSE/BSE universe foundation.</p>
         </div>
         <div class="hero-meta">
           <div class="badge">PAPER MODE</div>
@@ -27,6 +27,7 @@
         <button data-action="resume">Resume</button>
         <button data-action="scan">Scan Now</button>
         <button data-action="send-status-now">Send Status Now</button>
+        <button data-action="import-instruments">Import Instruments</button>
         <button data-action="kill-switch" class="danger">Kill Switch</button>
       </section>
 
@@ -38,6 +39,29 @@
         <article class="panel">
           <h2>System Overview</h2>
           <div id="system-overview" class="key-value">Loading...</div>
+        </article>
+      </section>
+
+      <section class="grid">
+        <article class="panel">
+          <h2>Universe Summary</h2>
+          <div id="universe-summary" class="stat-grid">Loading...</div>
+        </article>
+        <article class="panel">
+          <h2>Broker Mapping</h2>
+          <div id="broker-mapping-summary" class="stacked-list">Loading...</div>
+        </article>
+      </section>
+
+      <section class="grid">
+        <article class="panel">
+          <h2>Data Quality</h2>
+          <div id="data-quality-summary" class="stat-grid">Loading...</div>
+        </article>
+        <article class="panel">
+          <h2>Liquidity and Staleness</h2>
+          <div id="liquidity-summary" class="stat-grid">Loading...</div>
+          <div id="stale-data-summary" class="stat-grid compact-grid">Loading...</div>
         </article>
       </section>
 
@@ -63,15 +87,25 @@
         </article>
       </section>
 
+      <section class="panel">
+        <h2>Instrument Table</h2>
+        <div id="instrument-table" class="table-stack">Loading...</div>
+      </section>
+
       <section class="grid">
+        <article class="panel">
+          <h2>Conflicts</h2>
+          <div id="conflicts" class="stacked-list">Loading...</div>
+        </article>
         <article class="panel">
           <h2>Background Tasks</h2>
           <pre id="tasks">Loading...</pre>
         </article>
-        <article class="panel">
-          <h2>Runtime State</h2>
-          <pre id="state">Loading...</pre>
-        </article>
+      </section>
+
+      <section class="panel">
+        <h2>Runtime State</h2>
+        <pre id="state">Loading...</pre>
       </section>
     </main>
     <script src="/static/app.js"></script>

@@ -56,3 +56,8 @@ class NotificationResponse(BaseModel):
 
 class TelemetryEnvelope(BaseModel):
     data: Any
+
+
+class InstrumentImportRequest(BaseModel):
+    source: Optional[str] = None
+    path: Optional[str] = None

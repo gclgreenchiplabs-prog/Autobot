@@ -45,6 +45,22 @@ class Settings:
     telegram_timeout_seconds: int = 10
     telegram_max_retries: int = 3
     notification_retention_days: int = 0
+    enable_nse: bool = True
+    enable_bse: bool = True
+    enable_fno: bool = True
+    instrument_import_source: str = "FIXTURE"
+    instrument_import_path: str = ""
+    instrument_master_max_age_hours: int = 24
+    broker_mapping_max_age_hours: int = 24
+    quote_fresh_seconds: int = 10
+    quote_aging_seconds: int = 30
+    max_quote_age_seconds: int = 60
+    min_intraday_traded_value: float = 10_000_000.0
+    min_btst_traded_value: float = 5_000_000.0
+    min_swing_traded_value: float = 1_000_000.0
+    max_allowed_spread_pct: float = 0.50
+    min_option_oi: int = 1000
+    min_option_volume: int = 100
 
     @property
     def is_paper_mode(self) -> bool:
@@ -92,6 +108,22 @@ def load_settings(env_path: Optional[os.PathLike[str] | str | Path] = None) -> S
         telegram_timeout_seconds=int(merged.get("TELEGRAM_TIMEOUT_SECONDS") or 10),
         telegram_max_retries=int(merged.get("TELEGRAM_MAX_RETRIES") or 3),
         notification_retention_days=int(merged.get("NOTIFICATION_RETENTION_DAYS") or 0),
+        enable_nse=str(merged.get("ENABLE_NSE") or "true").strip().lower() in {"1", "true", "yes", "on"},
+        enable_bse=str(merged.get("ENABLE_BSE") or "true").strip().lower() in {"1", "true", "yes", "on"},
+        enable_fno=str(merged.get("ENABLE_FNO") or "true").strip().lower() in {"1", "true", "yes", "on"},
+        instrument_import_source=(merged.get("INSTRUMENT_IMPORT_SOURCE") or "FIXTURE").strip().upper(),
+        instrument_import_path=(merged.get("INSTRUMENT_IMPORT_PATH") or "").strip(),
+        instrument_master_max_age_hours=int(merged.get("INSTRUMENT_MASTER_MAX_AGE_HOURS") or 24),
+        broker_mapping_max_age_hours=int(merged.get("BROKER_MAPPING_MAX_AGE_HOURS") or 24),
+        quote_fresh_seconds=int(merged.get("QUOTE_FRESH_SECONDS") or 10),
+        quote_aging_seconds=int(merged.get("QUOTE_AGING_SECONDS") or 30),
+        max_quote_age_seconds=int(merged.get("MAX_QUOTE_AGE_SECONDS") or 60),
+        min_intraday_traded_value=float(merged.get("MIN_INTRADAY_TRADED_VALUE") or 10_000_000.0),
+        min_btst_traded_value=float(merged.get("MIN_BTST_TRADED_VALUE") or 5_000_000.0),
+        min_swing_traded_value=float(merged.get("MIN_SWING_TRADED_VALUE") or 1_000_000.0),
+        max_allowed_spread_pct=float(merged.get("MAX_ALLOWED_SPREAD_PCT") or 0.50),
+        min_option_oi=int(merged.get("MIN_OPTION_OI") or 1000),
+        min_option_volume=int(merged.get("MIN_OPTION_VOLUME") or 100),
     )
 
 
@@ -122,3 +154,15 @@ def validate_settings(settings: Settings) -> None:
         raise SettingsValidationError("invalid notification interval or recent-closed window")
     if settings.telegram_timeout_seconds <= 0 or settings.telegram_max_retries <= 0:
         raise SettingsValidationError("invalid telegram timeout or retry configuration")
+    if settings.instrument_master_max_age_hours <= 0 or settings.broker_mapping_max_age_hours <= 0:
+        raise SettingsValidationError("invalid instrument master or broker mapping max age")
+    if settings.quote_fresh_seconds <= 0 or settings.quote_aging_seconds <= 0 or settings.max_quote_age_seconds <= 0:
+        raise SettingsValidationError("invalid quote freshness configuration")
+    if settings.quote_fresh_seconds >= settings.quote_aging_seconds or settings.quote_aging_seconds >= settings.max_quote_age_seconds:
+        raise SettingsValidationError("quote freshness thresholds must increase strictly")
+    if settings.min_intraday_traded_value <= 0 or settings.min_btst_traded_value <= 0 or settings.min_swing_traded_value <= 0:
+        raise SettingsValidationError("invalid traded-value threshold")
+    if settings.max_allowed_spread_pct <= 0:
+        raise SettingsValidationError("invalid spread threshold")
+    if settings.min_option_oi < 0 or settings.min_option_volume < 0:
+        raise SettingsValidationError("invalid option liquidity threshold")
