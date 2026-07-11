@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from pydantic import BaseModel
 from typing import Any, Dict, List, Optional
+
+from pydantic import BaseModel
 
 
 class ControlRequest(BaseModel):
@@ -39,3 +40,19 @@ class StateResponse(BaseModel):
     events: List[Dict[str, Any]]
     orders: List[Dict[str, Any]]
     positions: List[Dict[str, Any]]
+
+
+class NotificationResponse(BaseModel):
+    notification_id: str
+    notification_type: str
+    severity: str
+    timestamp_utc: str
+    timestamp_ist: str
+    title: str
+    summary: str
+    delivery_status: str
+    payload_json: Dict[str, Any]
+
+
+class TelemetryEnvelope(BaseModel):
+    data: Any

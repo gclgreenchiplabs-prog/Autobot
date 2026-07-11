@@ -32,6 +32,19 @@ class Settings:
     post_market_end_time: str = "18:00"
     forced_test_mode: bool = False
     holiday_calendar_path: str = ""
+    opening_capital: float = 500_000.0
+    enable_notifications: bool = True
+    status_notification_interval_minutes: int = 5
+    status_send_unchanged: bool = True
+    status_include_recent_closed: bool = True
+    status_recent_closed_window_minutes: int = 10
+    enable_telegram: bool = False
+    telegram_bot_token: str = ""
+    telegram_chat_id: str = ""
+    telegram_parse_mode: str = "HTML"
+    telegram_timeout_seconds: int = 10
+    telegram_max_retries: int = 3
+    notification_retention_days: int = 0
 
     @property
     def is_paper_mode(self) -> bool:
@@ -66,6 +79,19 @@ def load_settings(env_path: Optional[os.PathLike[str] | str | Path] = None) -> S
         post_market_end_time=(merged.get("POST_MARKET_END_TIME") or "18:00").strip(),
         forced_test_mode=str(merged.get("FORCED_TEST_MODE") or "false").strip().lower() in {"1", "true", "yes", "on"},
         holiday_calendar_path=(merged.get("HOLIDAY_CALENDAR_PATH") or "").strip(),
+        opening_capital=float(merged.get("OPENING_CAPITAL") or 500_000.0),
+        enable_notifications=str(merged.get("ENABLE_NOTIFICATIONS") or "true").strip().lower() in {"1", "true", "yes", "on"},
+        status_notification_interval_minutes=int(merged.get("STATUS_NOTIFICATION_INTERVAL_MINUTES") or 5),
+        status_send_unchanged=str(merged.get("STATUS_SEND_UNCHANGED") or "true").strip().lower() in {"1", "true", "yes", "on"},
+        status_include_recent_closed=str(merged.get("STATUS_INCLUDE_RECENT_CLOSED") or "true").strip().lower() in {"1", "true", "yes", "on"},
+        status_recent_closed_window_minutes=int(merged.get("STATUS_RECENT_CLOSED_WINDOW_MINUTES") or 10),
+        enable_telegram=str(merged.get("ENABLE_TELEGRAM") or "false").strip().lower() in {"1", "true", "yes", "on"},
+        telegram_bot_token=(merged.get("TELEGRAM_BOT_TOKEN") or "").strip(),
+        telegram_chat_id=(merged.get("TELEGRAM_CHAT_ID") or "").strip(),
+        telegram_parse_mode=(merged.get("TELEGRAM_PARSE_MODE") or "HTML").strip().upper(),
+        telegram_timeout_seconds=int(merged.get("TELEGRAM_TIMEOUT_SECONDS") or 10),
+        telegram_max_retries=int(merged.get("TELEGRAM_MAX_RETRIES") or 3),
+        notification_retention_days=int(merged.get("NOTIFICATION_RETENTION_DAYS") or 0),
     )
 
 
@@ -90,3 +116,9 @@ def validate_settings(settings: Settings) -> None:
 
     if settings.log_max_bytes <= 0 or settings.log_backup_count <= 0:
         raise SettingsValidationError("invalid log size or backup count")
+    if settings.opening_capital <= 0:
+        raise SettingsValidationError("opening capital must be positive")
+    if settings.status_notification_interval_minutes <= 0 or settings.status_recent_closed_window_minutes < 0:
+        raise SettingsValidationError("invalid notification interval or recent-closed window")
+    if settings.telegram_timeout_seconds <= 0 or settings.telegram_max_retries <= 0:
+        raise SettingsValidationError("invalid telegram timeout or retry configuration")

@@ -1,8 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-import traceback
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, Callable, Dict, List, Optional
 
 
@@ -51,6 +50,15 @@ class BackgroundTaskManager:
 
     def start(self) -> None:
         return None
+
+    def set_state(self, name: str, state: str, error: Optional[str] = None) -> TaskRecord:
+        record = self._tasks.get(name)
+        if record is None:
+            record = TaskRecord(name=name)
+            self._tasks[name] = record
+        record.state = state
+        record.error = error
+        return record
 
     def stop(self, name: str) -> None:
         record = self._tasks.get(name)

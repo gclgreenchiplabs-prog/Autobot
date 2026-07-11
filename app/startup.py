@@ -42,14 +42,19 @@ class ApplicationStartupManager:
         self.container.health_monitor.record_startup()
         self.container.scheduler.start()
         self.container.task_manager.start()
+        self.container.notification_service.start()
+        self.container.status_scheduler.start()
         self.started = True
 
     async def shutdown(self) -> None:
         if not self.started:
             return
+        self.container.status_scheduler.stop()
+        self.container.notification_service.stop()
         self.container.task_manager.cancel_all()
         self.container.scheduler.stop()
         self.container.repository.save_state("lifecycle", {"status": "stopped", "mode": self.container.settings.trading_mode, "kill_switch": False})
+        self.container.health_monitor.record_shutdown()
         self.container.repository.save_health_snapshot("STOPPED", {"mode": self.container.settings.trading_mode})
         self.container.database.close()
         self.started = False

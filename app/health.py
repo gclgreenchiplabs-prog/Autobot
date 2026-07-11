@@ -19,6 +19,13 @@ class HealthMonitor:
         self.last_failure_reason = ""
 
     def record_startup(self) -> Dict[str, Any]:
+        self.status = "READY"
+        payload = self.snapshot()
+        self.state_store.set("health", payload)
+        return payload
+
+    def record_shutdown(self) -> Dict[str, Any]:
+        self.status = "STOPPED"
         payload = self.snapshot()
         self.state_store.set("health", payload)
         return payload

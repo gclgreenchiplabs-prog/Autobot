@@ -6,12 +6,10 @@ from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 
-from app.api.controls import ControlService
 from app.api.http import router as http_router
 from app.api.middleware import CorrelationMiddleware, add_exception_middleware
 from app.api.websocket import router as websocket_router
 from app.container import AppContainer
-from app.dashboard.service import DashboardService
 from app.logging_setup import configure_logging
 from app.startup import ApplicationStartupManager
 
@@ -28,8 +26,10 @@ def create_app(container: AppContainer | None = None) -> FastAPI:
     app.state.canonical_import_path = CANONICAL_APP_IMPORT_PATH
     app.state.container = runtime_container
     app.state.startup_manager = startup_manager
-    app.state.control_service = ControlService(state_store=runtime_container.state_store)
-    app.state.dashboard_service = DashboardService(state_store=runtime_container.state_store)
+    app.state.control_service = runtime_container.control_service
+    app.state.dashboard_service = runtime_container.dashboard_service
+    app.state.notification_service = runtime_container.notification_service
+    app.state.telemetry_service = runtime_container.telemetry_service
 
     add_exception_middleware(app)
     app.add_middleware(CorrelationMiddleware)
@@ -51,13 +51,19 @@ def create_app(container: AppContainer | None = None) -> FastAPI:
         dashboard_data = dashboard_service.get_state()
         return {
             "mode": container.settings.trading_mode,
-            "lifecycle": dashboard_data["lifecycle"],
-            "orders": dashboard_data["orders"],
-            "positions": dashboard_data["positions"],
+            "lifecycle": container.state_store.get("lifecycle") or {"status": "initialized", "mode": container.settings.trading_mode, "kill_switch": False},
+            "orders": container.state_store.get("orders", []),
+            "positions": container.state_store.get("positions", []),
             "broker": container.settings.primary_broker,
-            "health": container.health_monitor.snapshot(),
-            "session": container.scheduler.get_state(),
-            "tasks": container.task_manager.get_status(),
+            "database_path": container.settings.database_path,
+            "account_summary": dashboard_data["account_summary"],
+            "open_positions": dashboard_data["open_positions"],
+            "recently_exited": dashboard_data["recently_exited"],
+            "notifications": dashboard_data["notifications"],
+            "events": dashboard_data["detected_events"],
+            "health": dashboard_data["health"],
+            "session": dashboard_data["session"],
+            "tasks": dashboard_data["tasks"],
         }
 
     return app

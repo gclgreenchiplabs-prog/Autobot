@@ -34,7 +34,7 @@ def test_migration_runner_is_idempotent_and_uses_transaction(tmp_path):
     first = runner.apply()
     second = runner.apply()
     assert first == second
-    assert runner.current_version() == "001_initial_schema"
+    assert runner.current_version() == "002_notification_telemetry"
 
 
 def test_lifecycle_persists_state():
