@@ -7,6 +7,7 @@ if str(ROOT) not in sys.path:
 
 from fastapi.testclient import TestClient
 
+from dashboard_server import app as dashboard_app
 from main import app
 
 
@@ -17,6 +18,10 @@ def test_health_endpoint():
     response = client.get('/health')
     assert response.status_code == 200
     assert response.json()['mode'] == 'paper'
+
+
+def test_dashboard_app_reuses_main_app_instance():
+    assert dashboard_app is app
 
 
 def test_control_endpoints():
