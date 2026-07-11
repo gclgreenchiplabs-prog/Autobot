@@ -1,0 +1,15 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "swing-market-move-intraday-stocks-fno-bot"
+version = "0.1.0"
+description = "Sprint 1 scaffold for an intraday trading bot with paper mode and broker abstraction"
+requires-python = ">=3.10"
+dependencies = [
+  "python-dotenv>=1.0.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
