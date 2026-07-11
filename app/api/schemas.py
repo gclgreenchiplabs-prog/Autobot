@@ -22,13 +22,20 @@ class OrderResponse(BaseModel):
 class HealthResponse(BaseModel):
     status: str
     mode: str
-    broker: str
+    execution_mode: str
+    configured_primary_broker: str
+    active_execution_broker: str
+    standby_broker: str
     controls: List[str]
 
 
 class StateResponse(BaseModel):
     lifecycle: Dict[str, Any]
     broker: Dict[str, Any]
+    execution_mode: str
+    configured_primary_broker: str
+    active_execution_broker: str
+    standby_broker: str
     events: List[Dict[str, Any]]
     orders: List[Dict[str, Any]]
     positions: List[Dict[str, Any]]

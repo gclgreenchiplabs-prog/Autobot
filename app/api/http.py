@@ -26,12 +26,33 @@ settings = Settings()
 broker_router = BrokerRouter(settings=settings)
 
 
+def _broker_state() -> Dict[str, Any]:
+    if settings.is_paper_mode:
+        return {
+            "execution_mode": "paper",
+            "configured_primary_broker": "fyers",
+            "active_execution_broker": "paper",
+            "standby_broker": "dhan",
+        }
+
+    return {
+        "execution_mode": settings.trading_mode,
+        "configured_primary_broker": settings.primary_broker,
+        "active_execution_broker": settings.primary_broker,
+        "standby_broker": settings.standby_broker,
+    }
+
+
 @router.get("/health", response_model=HealthResponse)
 def health() -> HealthResponse:
+    broker_state = _broker_state()
     return HealthResponse(
         status="ok",
         mode=settings.trading_mode,
-        broker=settings.primary_broker,
+        execution_mode=broker_state["execution_mode"],
+        configured_primary_broker=broker_state["configured_primary_broker"],
+        active_execution_broker=broker_state["active_execution_broker"],
+        standby_broker=broker_state["standby_broker"],
         controls=["start", "stop", "pause", "resume", "scan", "kill-switch"],
     )
 
@@ -39,9 +60,18 @@ def health() -> HealthResponse:
 @router.get("/api/state", response_model=StateResponse)
 def get_state() -> StateResponse:
     lifecycle_state = state_store.get("lifecycle") or {"status": "initialized", "mode": settings.trading_mode, "kill_switch": False}
+    broker_state = _broker_state()
     return StateResponse(
         lifecycle=lifecycle_state,
-        broker={"name": broker_router.create_broker().name, "mode": settings.trading_mode, "connected": True},
+        broker={
+            "name": broker_state["active_execution_broker"],
+            "mode": broker_state["execution_mode"],
+            "connected": broker_state["execution_mode"] == "live",
+        },
+        execution_mode=broker_state["execution_mode"],
+        configured_primary_broker=broker_state["configured_primary_broker"],
+        active_execution_broker=broker_state["active_execution_broker"],
+        standby_broker=broker_state["standby_broker"],
         events=event_bus.list_events(),
         orders=state_store.get("orders", []),
         positions=state_store.get("positions", []),
@@ -50,7 +80,15 @@ def get_state() -> StateResponse:
 
 @router.get("/api/readiness")
 def readiness() -> Dict[str, Any]:
-    return {"ready": True, "mode": settings.trading_mode, "broker": settings.primary_broker}
+    broker_state = _broker_state()
+    return {
+        "ready": True,
+        "mode": settings.trading_mode,
+        "execution_mode": broker_state["execution_mode"],
+        "configured_primary_broker": broker_state["configured_primary_broker"],
+        "active_execution_broker": broker_state["active_execution_broker"],
+        "standby_broker": broker_state["standby_broker"],
+    }
 
 
 @router.get("/api/orders")
@@ -96,19 +134,3 @@ def control_scan() -> Dict[str, Any]:
 @router.post("/api/control/kill-switch")
 def control_kill_switch() -> Dict[str, Any]:
     return control_service.apply("kill-switch")
-
-
-@router.post("/api/orders")
-def create_order(payload: ControlRequest) -> Dict[str, Any]:
-    order = OrderRequest(symbol="NIFTY", quantity=1, action="buy")
-    result = broker_router.place_order(
-        order,
-        idempotency_key=payload.action,
-        idempotency_store=idempotency_store,
-        reconciliation_state=reconciliation_state,
-    )
-    orders = state_store.get("orders", [])
-    orders.append(result)
-    state_store.set("orders", orders)
-    event_bus.publish({"type": "order", "payload": result})
-    return result
