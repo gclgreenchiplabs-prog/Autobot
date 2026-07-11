@@ -9,6 +9,7 @@ from app.api.schemas import ControlRequest, HealthResponse, StateResponse
 from app.brokers.idempotency import IdempotencyStore
 from app.brokers.reconciliation import ReconciliationState
 from app.brokers.router import BrokerRouter
+from app.container import AppContainer
 from app.event_bus import EventBus
 from app.lifecycle import AppLifecycle
 from app.models import OrderRequest
@@ -23,6 +24,7 @@ event_bus = EventBus()
 idempotency_store = IdempotencyStore()
 reconciliation_state = ReconciliationState()
 settings = Settings()
+container = AppContainer(settings=settings)
 broker_router = BrokerRouter(settings=settings)
 
 
@@ -88,7 +90,23 @@ def readiness() -> Dict[str, Any]:
         "configured_primary_broker": broker_state["configured_primary_broker"],
         "active_execution_broker": broker_state["active_execution_broker"],
         "standby_broker": broker_state["standby_broker"],
+        "health": container.health_monitor.snapshot(),
     }
+
+
+@router.get("/api/tasks")
+def tasks() -> List[Dict[str, Any]]:
+    return container.task_manager.get_status()
+
+
+@router.get("/api/session")
+def session() -> Dict[str, Any]:
+    return container.scheduler.get_state()
+
+
+@router.get("/api/database/status")
+def database_status() -> Dict[str, Any]:
+    return {"database_path": container.settings.database_path, "ready": True}
 
 
 @router.get("/api/orders")

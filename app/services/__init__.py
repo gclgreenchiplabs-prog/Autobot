@@ -1,0 +1,1 @@
+"""Safe service registry package."""

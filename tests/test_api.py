@@ -7,6 +7,10 @@ if str(ROOT) not in sys.path:
 
 from fastapi.testclient import TestClient
 
+from app.api.http import router as http_router
+from app.container import AppContainer
+from app.scheduler.session_scheduler import SessionScheduler
+from app.tasks.manager import BackgroundTaskManager
 from dashboard_server import app as dashboard_app
 from main import app
 
@@ -43,5 +47,19 @@ def test_broker_fields_are_standardized_for_paper_mode():
 
 
 def test_orders_route_registered_once():
-    orders_routes = [route.path for route in app.routes if getattr(route, 'path', None) == '/api/orders']
+    orders_routes = [route.path for route in http_router.routes if getattr(route, 'path', None) == '/api/orders']
     assert len(orders_routes) == 1
+
+
+def test_container_shares_runtime_objects():
+    container_a = AppContainer()
+    container_b = AppContainer()
+
+    assert container_a.state_store is not container_b.state_store
+    assert container_a.settings.trading_mode == 'paper'
+
+
+def test_scheduler_and_tasks_are_available():
+    container = AppContainer()
+    assert isinstance(container.scheduler, SessionScheduler)
+    assert isinstance(container.task_manager, BackgroundTaskManager)
