@@ -350,6 +350,186 @@ class MigrationRunner:
                 CREATE INDEX IF NOT EXISTS idx_quotes_instrument ON market_quotes(instrument_id);
                 """,
             ),
+            (
+                "004_live_market_data_foundation",
+                """
+                CREATE TABLE IF NOT EXISTS market_data_connections (
+                    source TEXT PRIMARY KEY,
+                    connection_state TEXT NOT NULL,
+                    data_state TEXT NOT NULL,
+                    readiness_json TEXT NOT NULL,
+                    last_connected_at TEXT,
+                    last_updated TEXT NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS market_data_subscriptions (
+                    subscription_id TEXT PRIMARY KEY,
+                    instrument_id TEXT NOT NULL,
+                    source TEXT NOT NULL,
+                    broker_symbol TEXT NOT NULL,
+                    requested_at TEXT NOT NULL,
+                    subscribed_at TEXT,
+                    status TEXT NOT NULL,
+                    consumer TEXT NOT NULL,
+                    timeframes_json TEXT NOT NULL,
+                    last_tick_at TEXT,
+                    retry_count INTEGER NOT NULL,
+                    last_error TEXT,
+                    consumer_count INTEGER NOT NULL,
+                    FOREIGN KEY(instrument_id) REFERENCES instruments(instrument_id) ON DELETE CASCADE
+                );
+                CREATE TABLE IF NOT EXISTS market_ticks (
+                    tick_id TEXT PRIMARY KEY,
+                    instrument_id TEXT NOT NULL,
+                    company_id TEXT NOT NULL,
+                    exchange TEXT NOT NULL,
+                    segment TEXT NOT NULL,
+                    symbol TEXT NOT NULL,
+                    source TEXT NOT NULL,
+                    data_mode TEXT NOT NULL,
+                    timestamp_exchange TEXT NOT NULL,
+                    timestamp_received TEXT NOT NULL,
+                    timestamp_utc TEXT NOT NULL,
+                    timestamp_ist TEXT NOT NULL,
+                    sequence_number INTEGER,
+                    ltp REAL,
+                    last_quantity INTEGER,
+                    open REAL,
+                    high REAL,
+                    low REAL,
+                    previous_close REAL,
+                    bid REAL,
+                    ask REAL,
+                    bid_quantity INTEGER,
+                    ask_quantity INTEGER,
+                    volume INTEGER,
+                    traded_value REAL,
+                    vwap REAL,
+                    open_interest REAL,
+                    change_in_oi REAL,
+                    upper_circuit REAL,
+                    lower_circuit REAL,
+                    market_status TEXT,
+                    raw_reference_json TEXT NOT NULL,
+                    FOREIGN KEY(instrument_id) REFERENCES instruments(instrument_id) ON DELETE CASCADE,
+                    FOREIGN KEY(company_id) REFERENCES companies(company_id) ON DELETE CASCADE
+                );
+                CREATE TABLE IF NOT EXISTS market_tick_rejections (
+                    rejection_id TEXT PRIMARY KEY,
+                    tick_id TEXT NOT NULL,
+                    instrument_id TEXT NOT NULL,
+                    source TEXT NOT NULL,
+                    rejection_state TEXT NOT NULL,
+                    reasons_json TEXT NOT NULL,
+                    timestamp_utc TEXT NOT NULL,
+                    payload_json TEXT NOT NULL,
+                    FOREIGN KEY(instrument_id) REFERENCES instruments(instrument_id) ON DELETE CASCADE
+                );
+                CREATE TABLE IF NOT EXISTS market_data_sequences (
+                    source TEXT NOT NULL,
+                    instrument_id TEXT NOT NULL,
+                    sequence_number INTEGER,
+                    timestamp_utc TEXT NOT NULL,
+                    fingerprint TEXT NOT NULL,
+                    updated_at TEXT NOT NULL,
+                    PRIMARY KEY(source, instrument_id),
+                    FOREIGN KEY(instrument_id) REFERENCES instruments(instrument_id) ON DELETE CASCADE
+                );
+                CREATE TABLE IF NOT EXISTS market_data_heartbeats (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    source TEXT NOT NULL,
+                    timestamp_utc TEXT NOT NULL,
+                    payload_json TEXT NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS market_data_reconnects (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    source TEXT NOT NULL,
+                    attempt INTEGER NOT NULL,
+                    delay_seconds REAL NOT NULL,
+                    status TEXT NOT NULL,
+                    timestamp_utc TEXT NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS latest_quotes (
+                    instrument_id TEXT PRIMARY KEY,
+                    source TEXT NOT NULL,
+                    timestamp_utc TEXT NOT NULL,
+                    timestamp_ist TEXT NOT NULL,
+                    ltp REAL,
+                    bid REAL,
+                    ask REAL,
+                    volume INTEGER,
+                    traded_value REAL,
+                    data_mode TEXT NOT NULL,
+                    sequence_number INTEGER,
+                    payload_json TEXT NOT NULL,
+                    last_updated TEXT NOT NULL,
+                    FOREIGN KEY(instrument_id) REFERENCES instruments(instrument_id) ON DELETE CASCADE
+                );
+                CREATE TABLE IF NOT EXISTS market_candles (
+                    candle_id TEXT PRIMARY KEY,
+                    instrument_id TEXT NOT NULL,
+                    source TEXT NOT NULL,
+                    timeframe TEXT NOT NULL,
+                    start_time TEXT NOT NULL,
+                    end_time TEXT NOT NULL,
+                    open REAL NOT NULL,
+                    high REAL NOT NULL,
+                    low REAL NOT NULL,
+                    close REAL NOT NULL,
+                    volume INTEGER NOT NULL,
+                    traded_value REAL NOT NULL,
+                    vwap REAL NOT NULL,
+                    open_interest REAL NOT NULL,
+                    tick_count INTEGER NOT NULL,
+                    complete INTEGER NOT NULL,
+                    data_mode TEXT NOT NULL,
+                    FOREIGN KEY(instrument_id) REFERENCES instruments(instrument_id) ON DELETE CASCADE
+                );
+                CREATE TABLE IF NOT EXISTS market_data_events (
+                    event_id TEXT PRIMARY KEY,
+                    event_type TEXT NOT NULL,
+                    source TEXT NOT NULL,
+                    severity TEXT NOT NULL,
+                    instrument_id TEXT,
+                    symbol TEXT,
+                    reason TEXT,
+                    action_taken TEXT,
+                    detected_at TEXT NOT NULL,
+                    payload_json TEXT NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS decision_timeline (
+                    timeline_id TEXT PRIMARY KEY,
+                    correlation_id TEXT,
+                    trade_id TEXT,
+                    candidate_id TEXT,
+                    instrument_id TEXT,
+                    timestamp_utc TEXT NOT NULL,
+                    timestamp_ist TEXT NOT NULL,
+                    module TEXT NOT NULL,
+                    event_type TEXT NOT NULL,
+                    previous_value_json TEXT NOT NULL,
+                    new_value_json TEXT NOT NULL,
+                    reason TEXT,
+                    metrics_json TEXT NOT NULL,
+                    source TEXT NOT NULL,
+                    created_at TEXT NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS idx_market_ticks_instrument_id ON market_ticks(instrument_id);
+                CREATE INDEX IF NOT EXISTS idx_market_ticks_source ON market_ticks(source);
+                CREATE INDEX IF NOT EXISTS idx_market_ticks_timestamp_utc ON market_ticks(timestamp_utc);
+                CREATE INDEX IF NOT EXISTS idx_market_ticks_timestamp_ist ON market_ticks(timestamp_ist);
+                CREATE INDEX IF NOT EXISTS idx_market_ticks_sequence ON market_ticks(sequence_number);
+                CREATE INDEX IF NOT EXISTS idx_market_ticks_data_mode ON market_ticks(data_mode);
+                CREATE INDEX IF NOT EXISTS idx_market_subscriptions_status ON market_data_subscriptions(status);
+                CREATE INDEX IF NOT EXISTS idx_market_subscriptions_last_tick_at ON market_data_subscriptions(last_tick_at);
+                CREATE INDEX IF NOT EXISTS idx_market_candles_timeframe ON market_candles(timeframe);
+                CREATE INDEX IF NOT EXISTS idx_market_candles_start_time ON market_candles(start_time);
+                CREATE INDEX IF NOT EXISTS idx_market_rejections_timestamp ON market_tick_rejections(timestamp_utc);
+                CREATE INDEX IF NOT EXISTS idx_market_events_detected_at ON market_data_events(detected_at);
+                CREATE INDEX IF NOT EXISTS idx_decision_timeline_instrument_id ON decision_timeline(instrument_id);
+                CREATE INDEX IF NOT EXISTS idx_decision_timeline_event_type ON decision_timeline(event_type);
+                CREATE INDEX IF NOT EXISTS idx_decision_timeline_timestamp_utc ON decision_timeline(timestamp_utc);
+                """,
+            ),
         ]
 
     def current_version(self) -> Optional[str]:

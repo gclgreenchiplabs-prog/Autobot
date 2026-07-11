@@ -61,6 +61,30 @@ class Settings:
     max_allowed_spread_pct: float = 0.50
     min_option_oi: int = 1000
     min_option_volume: int = 100
+    enable_market_data: bool = True
+    market_data_mode: str = "FIXTURE"
+    primary_market_data_broker: str = "fyers"
+    standby_market_data_broker: str = "dhan"
+    enable_market_data_failover: bool = False
+    fyers_market_data_enable: bool = False
+    dhan_market_data_enable: bool = False
+    market_data_heartbeat_seconds: int = 5
+    market_data_stale_seconds: int = 15
+    market_data_failed_seconds: int = 60
+    market_data_reconnect_initial_seconds: int = 2
+    market_data_reconnect_max_seconds: int = 60
+    market_data_max_reconnect_attempts: int = 10
+    market_data_reconnect_jitter_seconds: float = 0.0
+    market_tick_retention_days: int = 0
+    market_candle_retention_days: int = 0
+    enable_1m_candles: bool = True
+    enable_5m_candles: bool = True
+    enable_15m_candles: bool = True
+    enable_30m_candles: bool = True
+    enable_daily_candles: bool = True
+    fixture_market_data_path: str = ""
+    fixture_tick_interval_ms: int = 1000
+    fixture_auto_start: bool = False
 
     @property
     def is_paper_mode(self) -> bool:
@@ -124,6 +148,30 @@ def load_settings(env_path: Optional[os.PathLike[str] | str | Path] = None) -> S
         max_allowed_spread_pct=float(merged.get("MAX_ALLOWED_SPREAD_PCT") or 0.50),
         min_option_oi=int(merged.get("MIN_OPTION_OI") or 1000),
         min_option_volume=int(merged.get("MIN_OPTION_VOLUME") or 100),
+        enable_market_data=str(merged.get("ENABLE_MARKET_DATA") or "true").strip().lower() in {"1", "true", "yes", "on"},
+        market_data_mode=(merged.get("MARKET_DATA_MODE") or "FIXTURE").strip().upper(),
+        primary_market_data_broker=(merged.get("PRIMARY_MARKET_DATA_BROKER") or "FYERS").strip().lower(),
+        standby_market_data_broker=(merged.get("STANDBY_MARKET_DATA_BROKER") or "DHAN").strip().lower(),
+        enable_market_data_failover=str(merged.get("ENABLE_MARKET_DATA_FAILOVER") or "false").strip().lower() in {"1", "true", "yes", "on"},
+        fyers_market_data_enable=str(merged.get("FYERS_MARKET_DATA_ENABLE") or "false").strip().lower() in {"1", "true", "yes", "on"},
+        dhan_market_data_enable=str(merged.get("DHAN_MARKET_DATA_ENABLE") or "false").strip().lower() in {"1", "true", "yes", "on"},
+        market_data_heartbeat_seconds=int(merged.get("MARKET_DATA_HEARTBEAT_SECONDS") or 5),
+        market_data_stale_seconds=int(merged.get("MARKET_DATA_STALE_SECONDS") or 15),
+        market_data_failed_seconds=int(merged.get("MARKET_DATA_FAILED_SECONDS") or 60),
+        market_data_reconnect_initial_seconds=int(merged.get("MARKET_DATA_RECONNECT_INITIAL_SECONDS") or 2),
+        market_data_reconnect_max_seconds=int(merged.get("MARKET_DATA_RECONNECT_MAX_SECONDS") or 60),
+        market_data_max_reconnect_attempts=int(merged.get("MARKET_DATA_MAX_RECONNECT_ATTEMPTS") or 10),
+        market_data_reconnect_jitter_seconds=float(merged.get("MARKET_DATA_RECONNECT_JITTER_SECONDS") or 0.0),
+        market_tick_retention_days=int(merged.get("MARKET_TICK_RETENTION_DAYS") or 0),
+        market_candle_retention_days=int(merged.get("MARKET_CANDLE_RETENTION_DAYS") or 0),
+        enable_1m_candles=str(merged.get("ENABLE_1M_CANDLES") or "true").strip().lower() in {"1", "true", "yes", "on"},
+        enable_5m_candles=str(merged.get("ENABLE_5M_CANDLES") or "true").strip().lower() in {"1", "true", "yes", "on"},
+        enable_15m_candles=str(merged.get("ENABLE_15M_CANDLES") or "true").strip().lower() in {"1", "true", "yes", "on"},
+        enable_30m_candles=str(merged.get("ENABLE_30M_CANDLES") or "true").strip().lower() in {"1", "true", "yes", "on"},
+        enable_daily_candles=str(merged.get("ENABLE_DAILY_CANDLES") or "true").strip().lower() in {"1", "true", "yes", "on"},
+        fixture_market_data_path=(merged.get("FIXTURE_MARKET_DATA_PATH") or "").strip(),
+        fixture_tick_interval_ms=int(merged.get("FIXTURE_TICK_INTERVAL_MS") or 1000),
+        fixture_auto_start=str(merged.get("FIXTURE_AUTO_START") or "false").strip().lower() in {"1", "true", "yes", "on"},
     )
 
 
@@ -166,3 +214,31 @@ def validate_settings(settings: Settings) -> None:
         raise SettingsValidationError("invalid spread threshold")
     if settings.min_option_oi < 0 or settings.min_option_volume < 0:
         raise SettingsValidationError("invalid option liquidity threshold")
+    if settings.market_data_mode not in {"FIXTURE", "LIVE", "DELAYED", "HISTORICAL"}:
+        raise SettingsValidationError("invalid market data mode")
+    if settings.primary_market_data_broker not in {"fyers", "dhan"} or settings.standby_market_data_broker not in {"fyers", "dhan"}:
+        raise SettingsValidationError("unsupported market-data broker")
+    if settings.market_data_heartbeat_seconds <= 0 or settings.market_data_stale_seconds <= 0 or settings.market_data_failed_seconds <= 0:
+        raise SettingsValidationError("invalid market-data timing configuration")
+    if settings.market_data_heartbeat_seconds >= settings.market_data_stale_seconds or settings.market_data_stale_seconds >= settings.market_data_failed_seconds:
+        raise SettingsValidationError("market-data thresholds must increase strictly")
+    if settings.market_data_reconnect_initial_seconds <= 0 or settings.market_data_reconnect_max_seconds <= 0:
+        raise SettingsValidationError("invalid market-data reconnect configuration")
+    if settings.market_data_reconnect_initial_seconds > settings.market_data_reconnect_max_seconds:
+        raise SettingsValidationError("market-data reconnect initial delay cannot exceed max delay")
+    if settings.market_data_max_reconnect_attempts < 0 or settings.market_data_reconnect_jitter_seconds < 0:
+        raise SettingsValidationError("invalid market-data retry configuration")
+    if settings.market_tick_retention_days < 0 or settings.market_candle_retention_days < 0:
+        raise SettingsValidationError("invalid market-data retention configuration")
+    if settings.fixture_tick_interval_ms <= 0:
+        raise SettingsValidationError("invalid fixture tick interval")
+    if not any(
+        [
+            settings.enable_1m_candles,
+            settings.enable_5m_candles,
+            settings.enable_15m_candles,
+            settings.enable_30m_candles,
+            settings.enable_daily_candles,
+        ]
+    ):
+        raise SettingsValidationError("at least one candle timeframe must be enabled")

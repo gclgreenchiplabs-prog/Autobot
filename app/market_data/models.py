@@ -52,3 +52,37 @@ class DataQualitySnapshot:
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
+
+
+@dataclass
+class MarketDataConnectionSnapshot:
+    source: str
+    connection_state: str
+    data_state: str
+    last_connected_at: str
+
+    def to_dict(self) -> Dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass
+class MarketCandleSnapshot:
+    instrument_id: str
+    source: str
+    timeframe: str
+    start_time: str
+    end_time: str
+    open: float
+    high: float
+    low: float
+    close: float
+    volume: int
+    traded_value: float
+    vwap: float
+    open_interest: float
+    tick_count: int
+    complete: bool
+    data_mode: str
+
+    def to_dict(self) -> Dict[str, Any]:
+        return asdict(self)

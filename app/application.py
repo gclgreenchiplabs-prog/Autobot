@@ -32,6 +32,8 @@ def create_app(container: AppContainer | None = None) -> FastAPI:
     app.state.telemetry_service = runtime_container.telemetry_service
     app.state.instrument_service = runtime_container.instrument_service
     app.state.market_data_repository = runtime_container.market_data_repository
+    app.state.market_data_service = runtime_container.market_data_service
+    app.state.audit_repository = runtime_container.audit_repository
 
     add_exception_middleware(app)
     app.add_middleware(CorrelationMiddleware)
@@ -70,6 +72,14 @@ def create_app(container: AppContainer | None = None) -> FastAPI:
             "stale_data_summary": dashboard_data["stale_data_summary"],
             "instrument_table": dashboard_data["instrument_table"],
             "conflicts": dashboard_data["conflicts"],
+            "market_data_status": dashboard_data["market_data_status"],
+            "market_data_connections": dashboard_data["market_data_connections"],
+            "market_data_subscriptions": dashboard_data["market_data_subscriptions"],
+            "market_data_quotes": dashboard_data["market_data_quotes"],
+            "market_data_candles": dashboard_data["market_data_candles"],
+            "market_data_events": dashboard_data["market_data_events"],
+            "market_data_heartbeat": dashboard_data["market_data_heartbeat"],
+            "audit_timeline": dashboard_data["audit_timeline"],
             "health": dashboard_data["health"],
             "session": dashboard_data["session"],
             "tasks": dashboard_data["tasks"],

@@ -16,3 +16,5 @@ def test_websocket_streams_state():
             message = websocket.receive_json()
             assert 'lifecycle' in message
             assert 'events' in message
+            assert 'market_data_status' in message
+            assert 'quote_update' in message

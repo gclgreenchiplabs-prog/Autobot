@@ -41,6 +41,7 @@ class ApplicationStartupManager:
             pass
         self.container.notification_service.start()
         self.container.instrument_service.start()
+        self.container.market_data_service.start()
         self.container.health_monitor.record_startup()
         self.container.scheduler.start()
         self.container.task_manager.start()
@@ -52,6 +53,7 @@ class ApplicationStartupManager:
             return
         self.container.status_scheduler.stop()
         self.container.notification_service.stop()
+        self.container.market_data_service.stop()
         self.container.task_manager.cancel_all()
         self.container.scheduler.stop()
         self.container.repository.save_state("lifecycle", {"status": "stopped", "mode": self.container.settings.trading_mode, "kill_switch": False})

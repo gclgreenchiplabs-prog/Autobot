@@ -40,6 +40,11 @@ async function postAction(action) {
   const endpointMap = {
     'send-status-now': '/api/control/send-status-now',
     'import-instruments': '/api/control/import-instruments',
+    'market-data-connect': '/api/control/market-data/connect',
+    'market-data-disconnect': '/api/control/market-data/disconnect',
+    'market-data-reconnect': '/api/control/market-data/reconnect',
+    'market-data-start-fixture': '/api/control/market-data/start-fixture',
+    'market-data-stop-fixture': '/api/control/market-data/stop-fixture',
   };
   const endpoint = endpointMap[action] || `/api/control/${action}`;
   const options = { method: 'POST', headers: { 'Content-Type': 'application/json' } };
@@ -113,6 +118,95 @@ async function refreshState() {
   renderSummaryGrid('data-quality-summary', state.data_quality_summary);
   renderSummaryGrid('liquidity-summary', state.liquidity_summary);
   renderSummaryGrid('stale-data-summary', state.stale_data_summary);
+
+  renderKeyValue('market-data-status', [
+    ['Mode', formatMaybe(state.market_data_status?.market_data_mode)],
+    ['Active Source', formatMaybe(state.market_data_status?.active_market_data_source)],
+    ['Primary Broker', formatMaybe(state.market_data_status?.primary_market_data_broker)],
+    ['Standby Broker', formatMaybe(state.market_data_status?.standby_market_data_broker)],
+    ['Primary State', formatMaybe(state.market_data_status?.primary_connection_state)],
+    ['Standby State', formatMaybe(state.market_data_status?.standby_connection_state)],
+    ['Quote Cache', formatMaybe(state.market_data_status?.quote_cache_size)],
+    ['Subscriptions', formatMaybe(state.market_data_status?.active_subscriptions)],
+  ]);
+
+  renderKeyValue('market-data-heartbeat', [
+    ['Heartbeat State', formatMaybe(state.market_data_heartbeat?.state)],
+    ['Last Socket', formatMaybe(state.market_data_heartbeat?.last_socket_message)],
+    ['Last Valid Tick', formatMaybe(state.market_data_heartbeat?.last_valid_tick)],
+    ['Last Reconnect', formatMaybe(state.market_data_heartbeat?.last_reconnect)],
+    ['Reconnect Count', formatMaybe(state.market_data_heartbeat?.reconnect_count)],
+    ['Stale Instruments', formatMaybe(state.market_data_heartbeat?.stale_instrument_count)],
+  ]);
+
+  renderCards(
+    'market-data-subscriptions',
+    state.market_data_subscriptions,
+    (subscription) => `
+      <article class="item-card">
+        <div class="item-head">
+          <strong>${subscription.instrument_id}</strong>
+          <span>${subscription.source}</span>
+        </div>
+        <div class="item-grid">
+          <span>Status ${subscription.status}</span>
+          <span>Last Tick ${subscription.last_tick_at || 'N/A'}</span>
+          <span>Retry ${subscription.retry_count}</span>
+          <span>Consumers ${subscription.consumer_count}</span>
+        </div>
+      </article>
+    `,
+    'No active subscriptions.'
+  );
+
+  renderCards(
+    'market-data-events',
+    state.market_data_events,
+    (event) => `
+      <article class="item-card">
+        <div class="item-head">
+          <strong>${event.event_type}</strong>
+          <span>${event.source}</span>
+        </div>
+        <div class="item-grid">
+          <span>Severity ${event.severity}</span>
+          <span>Action ${event.action_taken || 'N/A'}</span>
+        </div>
+        <p>${event.reason || event.payload_json?.description || 'No details provided.'}</p>
+      </article>
+    `,
+    'No market-data events.'
+  );
+
+  renderCards(
+    'market-data-quotes',
+    state.market_data_quotes,
+    (quote) => `
+      <article class="table-row">
+        <div><strong>${quote.symbol || quote.instrument_id}</strong><span>${quote.source}</span></div>
+        <div>${quote.data_mode} | ${quote.timestamp_ist || quote.timestamp_utc}</div>
+        <div>LTP ${formatMoney(quote.ltp)}</div>
+        <div>Bid ${formatMoney(quote.bid)} | Ask ${formatMoney(quote.ask)}</div>
+        <div>Volume ${formatMaybe(quote.volume)}</div>
+      </article>
+    `,
+    'No quotes in cache.'
+  );
+
+  renderCards(
+    'market-data-candles',
+    state.market_data_candles,
+    (candle) => `
+      <article class="table-row">
+        <div><strong>${candle.instrument_id}</strong><span>${candle.timeframe}</span></div>
+        <div>${candle.data_mode} | ${candle.complete ? 'COMPLETE' : 'INCOMPLETE'}</div>
+        <div>O ${formatMoney(candle.open)} H ${formatMoney(candle.high)}</div>
+        <div>L ${formatMoney(candle.low)} C ${formatMoney(candle.close)}</div>
+        <div>Volume ${formatMaybe(candle.volume)}</div>
+      </article>
+    `,
+    'No candles built yet.'
+  );
 
   renderCards(
     'open-positions',
@@ -241,6 +335,26 @@ async function refreshState() {
   );
 
   document.getElementById('tasks').textContent = JSON.stringify(state.tasks, null, 2);
+
+  renderCards(
+    'audit-timeline',
+    state.audit_timeline,
+    (entry) => `
+      <article class="item-card">
+        <div class="item-head">
+          <strong>${entry.event_type}</strong>
+          <span>${entry.module}</span>
+        </div>
+        <div class="item-grid">
+          <span>Instrument ${entry.instrument_id || 'N/A'}</span>
+          <span>Source ${entry.source || 'N/A'}</span>
+        </div>
+        <p>${entry.reason || 'No reason provided.'}</p>
+      </article>
+    `,
+    'No audit timeline entries.'
+  );
+
   document.getElementById('state').textContent = JSON.stringify(state, null, 2);
 }
 

@@ -27,6 +27,18 @@ class HealthResponse(BaseModel):
     configured_primary_broker: str
     active_execution_broker: str
     standby_broker: str
+    market_data_mode: str
+    primary_market_data_broker: str
+    standby_market_data_broker: str
+    active_market_data_source: str
+    primary_connection_state: str
+    standby_connection_state: str
+    last_valid_tick: Optional[str] = None
+    quote_cache_size: int = 0
+    active_subscriptions: int = 0
+    stale_instruments: int = 0
+    reconnect_count: int = 0
+    candle_builder_state: str = "NOT_READY"
     controls: List[str]
 
 
@@ -37,6 +49,7 @@ class StateResponse(BaseModel):
     configured_primary_broker: str
     active_execution_broker: str
     standby_broker: str
+    market_data_status: Dict[str, Any]
     events: List[Dict[str, Any]]
     orders: List[Dict[str, Any]]
     positions: List[Dict[str, Any]]
@@ -61,3 +74,14 @@ class TelemetryEnvelope(BaseModel):
 class InstrumentImportRequest(BaseModel):
     source: Optional[str] = None
     path: Optional[str] = None
+
+
+class MarketDataSubscriptionRequest(BaseModel):
+    instrument_ids: List[str]
+    consumer: str = "api"
+    source: Optional[str] = None
+    timeframes: Optional[List[str]] = None
+
+
+class MarketDataControlRequest(BaseModel):
+    source: Optional[str] = None

@@ -88,6 +88,9 @@ class NotificationService:
             "configured_primary_broker": account.configured_primary_broker,
             "active_execution_broker": account.active_execution_broker,
             "standby_broker": account.standby_broker,
+            "primary_market_data_broker": (self.state_store.get("market_data_status") or {}).get("primary_market_data_broker"),
+            "standby_market_data_broker": (self.state_store.get("market_data_status") or {}).get("standby_market_data_broker"),
+            "active_market_data_source": (self.state_store.get("market_data_status") or {}).get("active_market_data_source"),
         }
 
     def create_notification(
@@ -151,6 +154,7 @@ class NotificationService:
                 "execution_mode": payload["system"]["execution_mode"],
                 "data_state": payload["system"]["data_state"],
                 "health_status": payload["system"]["health_status"],
+                "market_data": payload["system"].get("market_data", {}),
             },
             "account": payload["account"],
             "open_positions": payload["open_positions"],
@@ -179,17 +183,30 @@ class NotificationService:
         session = self.scheduler.get_state()
         lifecycle = self.state_store.get("lifecycle") or {"status": "initialized", "mode": self.settings.trading_mode, "kill_switch": False}
         recent_events = self.event_bus.list_events()[-10:]
+        market_data = self.state_store.get("market_data_status") or {}
         return {
             "system": {
                 "bot_state": lifecycle.get("status"),
                 "session_state": session.get("session_state"),
                 "current_ist_time": session.get("ist_time"),
                 "execution_mode": account["execution_mode"],
-                "data_state": self.state_store.get("data_feed_state", "UNKNOWN"),
+                "data_state": market_data.get("market_data_mode", self.state_store.get("data_feed_state", "UNKNOWN")),
                 "primary_broker": account["configured_primary_broker"],
                 "active_broker": account["active_execution_broker"],
                 "standby_broker": account["standby_broker"],
                 "health_status": health.get("status"),
+                "market_data": {
+                    "source": market_data.get("active_market_data_source"),
+                    "connection_health": (market_data.get("heartbeat") or {}).get("state"),
+                    "last_valid_tick": (market_data.get("heartbeat") or {}).get("last_valid_tick"),
+                    "active_subscriptions": market_data.get("active_subscriptions"),
+                    "stale_instruments": market_data.get("stale_instruments"),
+                    "quote_cache_size": market_data.get("quote_cache_size"),
+                    "candle_count": market_data.get("completed_candles", {}),
+                    "recent_market_data_errors": [
+                        event for event in recent_events if str(event.get("event_type", "")).startswith(("MARKET_DATA_", "SEQUENCE_", "TICK_", "SUBSCRIPTION_"))
+                    ][-5:],
+                },
             },
             "account": account,
             "open_positions": positions,
@@ -239,7 +256,7 @@ class NotificationService:
         raw_type = str(event.get("event_type") or "").strip().upper()
         if raw_type in {member.value for member in NotificationType}:
             return raw_type
-        if raw_type.startswith(("INSTRUMENT_", "DATA_QUALITY_", "QUOTE_", "LIQUIDITY_", "SPREAD_", "UNIVERSE_")):
+        if raw_type.startswith(("INSTRUMENT_", "DATA_QUALITY_", "QUOTE_", "LIQUIDITY_", "SPREAD_", "UNIVERSE_", "MARKET_DATA_", "SEQUENCE_", "TICK_", "SUBSCRIPTION_", "CANDLE_")):
             return raw_type
         if "CORPORATE" in raw_type:
             return NotificationType.CORPORATE_EVENT_DETECTED.value

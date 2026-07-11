@@ -3,6 +3,7 @@ from __future__ import annotations
 from app.brokers.idempotency import IdempotencyStore
 from app.brokers.reconciliation import ReconciliationState
 from app.brokers.router import BrokerRouter
+from app.audit import AuditTimelineRepository
 from app.database.connection import DatabaseConnection
 from app.database.migrations import MigrationRunner
 from app.database.repository import Repository
@@ -12,7 +13,7 @@ from app.instruments import InstrumentCache, InstrumentService
 from app.instruments.repository import InstrumentRepository
 from app.lifecycle import AppLifecycle
 from app.logging_setup import configure_logging
-from app.market_data import MarketDataRepository
+from app.market_data import MarketDataRepository, MarketDataService
 from app.notifications import (
     NotificationDispatcher,
     NotificationFormatter,
@@ -55,7 +56,8 @@ class AppContainer:
         self.service_registry = ServiceRegistry()
         self.telemetry_service = TelemetryService(self.settings, self.state_store, self.repository, self.event_bus)
         self.instrument_repository = InstrumentRepository(self.repository)
-        self.market_data_repository = MarketDataRepository(self.instrument_repository)
+        self.audit_repository = AuditTimelineRepository(self.repository, timezone_name=self.settings.timezone)
+        self.market_data_repository = MarketDataRepository(self.repository, self.instrument_repository)
         self.instrument_cache = InstrumentCache(self.instrument_repository)
         self.notification_repository = NotificationRepository(self.repository)
         self.notification_formatter = NotificationFormatter()
@@ -81,6 +83,14 @@ class AppContainer:
             event_bus=self.event_bus,
             migration_version_getter=self.migrations.current_version,
         )
+        self.market_data_service = MarketDataService(
+            settings=self.settings,
+            state_store=self.state_store,
+            repository=self.market_data_repository,
+            instrument_repository=self.instrument_repository,
+            event_bus=self.event_bus,
+            audit_repository=self.audit_repository,
+        )
         self.status_scheduler = StatusNotificationScheduler(
             notification_service=self.notification_service,
             task_manager=self.task_manager,
@@ -95,6 +105,8 @@ class AppContainer:
             notification_service=self.notification_service,
             instrument_service=self.instrument_service,
             market_data_repository=self.market_data_repository,
+            market_data_service=self.market_data_service,
+            audit_repository=self.audit_repository,
             event_bus=self.event_bus,
             health_monitor=self.health_monitor,
             scheduler=self.scheduler,
@@ -111,3 +123,5 @@ class AppContainer:
         self.service_registry.register("telemetry_service", self.telemetry_service)
         self.service_registry.register("notification_service", self.notification_service)
         self.service_registry.register("instrument_service", self.instrument_service)
+        self.service_registry.register("market_data_service", self.market_data_service)
+        self.service_registry.register("audit_repository", self.audit_repository)
