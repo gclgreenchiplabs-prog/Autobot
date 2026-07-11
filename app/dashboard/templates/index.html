@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>MARKET MOVE AI Dashboard</title>
+    <link rel="stylesheet" href="/static/style.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <header>
+        <h1>MARKET MOVE AI</h1>
+        <div class="badge">PAPER MODE</div>
+      </header>
+      <section class="controls">
+        <button data-action="start">Start</button>
+        <button data-action="stop">Stop</button>
+        <button data-action="pause">Pause</button>
+        <button data-action="resume">Resume</button>
+        <button data-action="scan">Scan Now</button>
+        <button data-action="kill-switch" class="danger">Kill Switch</button>
+      </section>
+      <section class="status-card">
+        <h2>Runtime State</h2>
+        <pre id="state">Loading...</pre>
+      </section>
+    </main>
+    <script src="/static/app.js"></script>
+  </body>
+</html>
