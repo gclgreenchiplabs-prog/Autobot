@@ -8,6 +8,7 @@ if str(ROOT) not in sys.path:
 from fastapi.testclient import TestClient
 
 from app.api.http import router as http_router
+from app.application import app as canonical_app
 from app.container import AppContainer
 from app.scheduler.session_scheduler import SessionScheduler
 from app.tasks.manager import BackgroundTaskManager
@@ -15,7 +16,7 @@ from dashboard_server import app as dashboard_app
 from main import app
 
 
-client = TestClient(app)
+client = TestClient(canonical_app)
 
 
 def test_health_endpoint():
@@ -25,6 +26,7 @@ def test_health_endpoint():
 
 
 def test_dashboard_app_reuses_main_app_instance():
+    assert app is canonical_app
     assert dashboard_app is app
 
 

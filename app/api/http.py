@@ -2,33 +2,25 @@ from __future__ import annotations
 
 from typing import Any, Dict, List
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Request
 
 from app.api.controls import ControlService
-from app.api.schemas import ControlRequest, HealthResponse, StateResponse
-from app.brokers.idempotency import IdempotencyStore
-from app.brokers.reconciliation import ReconciliationState
-from app.brokers.router import BrokerRouter
+from app.api.schemas import HealthResponse, StateResponse
 from app.container import AppContainer
-from app.event_bus import EventBus
-from app.lifecycle import AppLifecycle
-from app.models import OrderRequest
-from app.settings import Settings
-from app.state_store import StateStore
 
 router = APIRouter()
-state_store = StateStore()
-lifecycle = AppLifecycle(state_store=state_store)
-control_service = ControlService(state_store=state_store)
-event_bus = EventBus()
-idempotency_store = IdempotencyStore()
-reconciliation_state = ReconciliationState()
-settings = Settings()
-container = AppContainer(settings=settings)
-broker_router = BrokerRouter(settings=settings)
 
 
-def _broker_state() -> Dict[str, Any]:
+def _get_container(request: Request) -> AppContainer:
+    return request.app.state.container
+
+
+def _get_control_service(request: Request) -> ControlService:
+    return request.app.state.control_service
+
+
+def _broker_state(container: AppContainer) -> Dict[str, Any]:
+    settings = container.settings
     if settings.is_paper_mode:
         return {
             "execution_mode": "paper",
@@ -46,8 +38,9 @@ def _broker_state() -> Dict[str, Any]:
 
 
 @router.get("/health", response_model=HealthResponse)
-def health() -> HealthResponse:
-    broker_state = _broker_state()
+def health(request: Request) -> HealthResponse:
+    broker_state = _broker_state(_get_container(request))
+    settings = _get_container(request).settings
     return HealthResponse(
         status="ok",
         mode=settings.trading_mode,
@@ -60,9 +53,10 @@ def health() -> HealthResponse:
 
 
 @router.get("/api/state", response_model=StateResponse)
-def get_state() -> StateResponse:
-    lifecycle_state = state_store.get("lifecycle") or {"status": "initialized", "mode": settings.trading_mode, "kill_switch": False}
-    broker_state = _broker_state()
+def get_state(request: Request) -> StateResponse:
+    container = _get_container(request)
+    broker_state = _broker_state(container)
+    lifecycle_state = container.state_store.get("lifecycle") or {"status": "initialized", "mode": container.settings.trading_mode, "kill_switch": False}
     return StateResponse(
         lifecycle=lifecycle_state,
         broker={
@@ -74,18 +68,19 @@ def get_state() -> StateResponse:
         configured_primary_broker=broker_state["configured_primary_broker"],
         active_execution_broker=broker_state["active_execution_broker"],
         standby_broker=broker_state["standby_broker"],
-        events=event_bus.list_events(),
-        orders=state_store.get("orders", []),
-        positions=state_store.get("positions", []),
+        events=container.event_bus.list_events(),
+        orders=container.state_store.get("orders", []),
+        positions=container.state_store.get("positions", []),
     )
 
 
 @router.get("/api/readiness")
-def readiness() -> Dict[str, Any]:
-    broker_state = _broker_state()
+def readiness(request: Request) -> Dict[str, Any]:
+    container = _get_container(request)
+    broker_state = _broker_state(container)
     return {
         "ready": True,
-        "mode": settings.trading_mode,
+        "mode": container.settings.trading_mode,
         "execution_mode": broker_state["execution_mode"],
         "configured_primary_broker": broker_state["configured_primary_broker"],
         "active_execution_broker": broker_state["active_execution_broker"],
@@ -95,60 +90,61 @@ def readiness() -> Dict[str, Any]:
 
 
 @router.get("/api/tasks")
-def tasks() -> List[Dict[str, Any]]:
-    return container.task_manager.get_status()
+def tasks(request: Request) -> List[Dict[str, Any]]:
+    return _get_container(request).task_manager.get_status()
 
 
 @router.get("/api/session")
-def session() -> Dict[str, Any]:
-    return container.scheduler.get_state()
+def session(request: Request) -> Dict[str, Any]:
+    return _get_container(request).scheduler.get_state()
 
 
 @router.get("/api/database/status")
-def database_status() -> Dict[str, Any]:
+def database_status(request: Request) -> Dict[str, Any]:
+    container = _get_container(request)
     return {"database_path": container.settings.database_path, "ready": True}
 
 
 @router.get("/api/orders")
-def orders() -> List[Dict[str, Any]]:
-    return state_store.get("orders", [])
+def orders(request: Request) -> List[Dict[str, Any]]:
+    return _get_container(request).state_store.get("orders", [])
 
 
 @router.get("/api/positions")
-def positions() -> List[Dict[str, Any]]:
-    return state_store.get("positions", [])
+def positions(request: Request) -> List[Dict[str, Any]]:
+    return _get_container(request).state_store.get("positions", [])
 
 
 @router.get("/api/events")
-def events() -> List[Dict[str, Any]]:
-    return event_bus.list_events()
+def events(request: Request) -> List[Dict[str, Any]]:
+    return _get_container(request).event_bus.list_events()
 
 
 @router.post("/api/control/start")
-def control_start() -> Dict[str, Any]:
-    return control_service.apply("start")
+def control_start(request: Request) -> Dict[str, Any]:
+    return _get_control_service(request).apply("start")
 
 
 @router.post("/api/control/stop")
-def control_stop() -> Dict[str, Any]:
-    return control_service.apply("stop")
+def control_stop(request: Request) -> Dict[str, Any]:
+    return _get_control_service(request).apply("stop")
 
 
 @router.post("/api/control/pause")
-def control_pause() -> Dict[str, Any]:
-    return control_service.apply("pause")
+def control_pause(request: Request) -> Dict[str, Any]:
+    return _get_control_service(request).apply("pause")
 
 
 @router.post("/api/control/resume")
-def control_resume() -> Dict[str, Any]:
-    return control_service.apply("resume")
+def control_resume(request: Request) -> Dict[str, Any]:
+    return _get_control_service(request).apply("resume")
 
 
 @router.post("/api/control/scan")
-def control_scan() -> Dict[str, Any]:
-    return control_service.apply("scan")
+def control_scan(request: Request) -> Dict[str, Any]:
+    return _get_control_service(request).apply("scan")
 
 
 @router.post("/api/control/kill-switch")
-def control_kill_switch() -> Dict[str, Any]:
-    return control_service.apply("kill-switch")
+def control_kill_switch(request: Request) -> Dict[str, Any]:
+    return _get_control_service(request).apply("kill-switch")

@@ -18,6 +18,9 @@ class ApplicationStartupManager:
 
     @asynccontextmanager
     async def lifespan(self, app: FastAPI) -> AsyncIterator[None]:
+        self.app = app
+        app.state.container = self.container
+        app.state.startup_manager = self
         await self.startup()
         try:
             yield
