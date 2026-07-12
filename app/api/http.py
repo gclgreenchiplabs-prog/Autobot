@@ -38,6 +38,10 @@ def _get_market_data_service(request: Request) -> Any:
     return request.app.state.market_data_service
 
 
+def _get_broker_readiness_service(request: Request) -> Any:
+    return request.app.state.broker_readiness_service
+
+
 def _get_audit_repository(request: Request) -> Any:
     return request.app.state.audit_repository
 
@@ -47,15 +51,15 @@ def _broker_state(container: AppContainer) -> Dict[str, Any]:
     if settings.is_paper_mode:
         return {
             "execution_mode": "paper",
-            "configured_primary_broker": "fyers",
+            "configured_primary_broker": settings.primary_broker,
             "active_execution_broker": "paper",
-            "standby_broker": "dhan",
+            "standby_broker": settings.standby_broker,
         }
 
     return {
         "execution_mode": settings.trading_mode,
         "configured_primary_broker": settings.primary_broker,
-        "active_execution_broker": settings.primary_broker,
+        "active_execution_broker": settings.execution_broker,
         "standby_broker": settings.standby_broker,
     }
 
@@ -66,6 +70,7 @@ def health(request: Request) -> HealthResponse:
     broker_state = _broker_state(container)
     settings = container.settings
     market_data = _get_market_data_service(request).status()
+    brokers = _get_broker_readiness_service(request).refresh()
     heartbeat = market_data.get("heartbeat") or {}
     return HealthResponse(
         status="ok",
@@ -80,6 +85,7 @@ def health(request: Request) -> HealthResponse:
         active_market_data_source=market_data["active_market_data_source"],
         primary_connection_state=market_data["primary_connection_state"],
         standby_connection_state=market_data["standby_connection_state"],
+        brokers=brokers,
         last_valid_tick=heartbeat.get("last_valid_tick"),
         quote_cache_size=market_data["quote_cache_size"],
         active_subscriptions=market_data["active_subscriptions"],
@@ -111,17 +117,21 @@ def get_state(request: Request) -> StateResponse:
     container = _get_container(request)
     broker_state = _broker_state(container)
     lifecycle_state = container.state_store.get("lifecycle") or {"status": "initialized", "mode": container.settings.trading_mode, "kill_switch": False}
+    brokers = _get_broker_readiness_service(request).refresh()
+    active_broker = broker_state["active_execution_broker"]
+    active_connected = False if active_broker == "paper" else bool((brokers.get(active_broker) or {}).get("connected"))
     return StateResponse(
         lifecycle=lifecycle_state,
         broker={
-            "name": broker_state["active_execution_broker"],
+            "name": active_broker,
             "mode": broker_state["execution_mode"],
-            "connected": broker_state["execution_mode"] == "live",
+            "connected": active_connected,
         },
         execution_mode=broker_state["execution_mode"],
         configured_primary_broker=broker_state["configured_primary_broker"],
         active_execution_broker=broker_state["active_execution_broker"],
         standby_broker=broker_state["standby_broker"],
+        brokers=brokers,
         market_data_status=_get_market_data_service(request).status(),
         events=container.event_bus.list_events(),
         orders=container.state_store.get("orders", []),
@@ -133,13 +143,19 @@ def get_state(request: Request) -> StateResponse:
 def readiness(request: Request) -> Dict[str, Any]:
     container = _get_container(request)
     broker_state = _broker_state(container)
+    brokers = _get_broker_readiness_service(request).refresh()
     return {
         "ready": True,
         "mode": container.settings.trading_mode,
         "execution_mode": broker_state["execution_mode"],
+        "market_data_mode": container.settings.market_data_mode.lower(),
         "configured_primary_broker": broker_state["configured_primary_broker"],
         "active_execution_broker": broker_state["active_execution_broker"],
         "standby_broker": broker_state["standby_broker"],
+        "primary_market_data_broker": container.settings.primary_market_data_broker,
+        "active_market_data_source": _get_market_data_service(request).status().get("active_market_data_source"),
+        "standby_market_data_broker": container.settings.standby_market_data_broker,
+        "brokers": brokers,
         "health": container.health_monitor.snapshot(),
         "universe": container.state_store.get("universe_status") or {},
         "market_data": _get_market_data_service(request).status(),
@@ -293,12 +309,18 @@ def market_data_liquidity(
 
 @router.get("/api/market-data/status")
 def market_data_status(request: Request) -> Dict[str, Any]:
-    return _get_market_data_service(request).status()
+    return {
+        **_get_market_data_service(request).status(),
+        "brokers": _get_broker_readiness_service(request).refresh(),
+    }
 
 
 @router.get("/api/market-data/connections")
-def market_data_connections(request: Request) -> List[Dict[str, Any]]:
-    return _get_market_data_service(request).connections()
+def market_data_connections(request: Request) -> Dict[str, Any]:
+    return {
+        "connections": _get_market_data_service(request).connections(),
+        "brokers": _get_broker_readiness_service(request).refresh(),
+    }
 
 
 @router.get("/api/market-data/subscriptions")
@@ -496,7 +518,9 @@ def control_import_instruments(request: Request, payload: Optional[InstrumentImp
 def control_market_data_connect(request: Request, payload: Optional[MarketDataControlRequest] = Body(default=None)) -> Dict[str, Any]:
     body = payload.model_dump(exclude_none=True) if payload is not None else {}
     try:
-        return _get_market_data_service(request).connect(body.get("source"))
+        result = _get_market_data_service(request).connect(body.get("source"))
+        _get_broker_readiness_service(request).refresh()
+        return result
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -505,7 +529,9 @@ def control_market_data_connect(request: Request, payload: Optional[MarketDataCo
 def control_market_data_disconnect(request: Request, payload: Optional[MarketDataControlRequest] = Body(default=None)) -> Dict[str, Any]:
     body = payload.model_dump(exclude_none=True) if payload is not None else {}
     try:
-        return _get_market_data_service(request).disconnect(body.get("source"))
+        result = _get_market_data_service(request).disconnect(body.get("source"))
+        _get_broker_readiness_service(request).refresh()
+        return result
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -514,7 +540,9 @@ def control_market_data_disconnect(request: Request, payload: Optional[MarketDat
 def control_market_data_reconnect(request: Request, payload: Optional[MarketDataControlRequest] = Body(default=None)) -> Dict[str, Any]:
     body = payload.model_dump(exclude_none=True) if payload is not None else {}
     try:
-        return _get_market_data_service(request).reconnect(body.get("source"))
+        result = _get_market_data_service(request).reconnect(body.get("source"))
+        _get_broker_readiness_service(request).refresh()
+        return result
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -522,12 +550,14 @@ def control_market_data_reconnect(request: Request, payload: Optional[MarketData
 @router.post("/api/control/market-data/subscribe")
 def control_market_data_subscribe(request: Request, payload: MarketDataSubscriptionRequest) -> Dict[str, Any]:
     try:
-        return _get_market_data_service(request).subscribe(
+        result = _get_market_data_service(request).subscribe(
             instrument_ids=payload.instrument_ids,
             consumer=payload.consumer,
             source=payload.source,
             timeframes=payload.timeframes,
         )
+        _get_broker_readiness_service(request).refresh()
+        return result
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -535,11 +565,13 @@ def control_market_data_subscribe(request: Request, payload: MarketDataSubscript
 @router.post("/api/control/market-data/unsubscribe")
 def control_market_data_unsubscribe(request: Request, payload: MarketDataSubscriptionRequest) -> Dict[str, Any]:
     try:
-        return _get_market_data_service(request).unsubscribe(
+        result = _get_market_data_service(request).unsubscribe(
             instrument_ids=payload.instrument_ids,
             consumer=payload.consumer,
             source=payload.source,
         )
+        _get_broker_readiness_service(request).refresh()
+        return result
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -547,11 +579,15 @@ def control_market_data_unsubscribe(request: Request, payload: MarketDataSubscri
 @router.post("/api/control/market-data/start-fixture")
 def control_market_data_start_fixture(request: Request) -> Dict[str, Any]:
     try:
-        return _get_market_data_service(request).start_fixture()
+        result = _get_market_data_service(request).start_fixture()
+        _get_broker_readiness_service(request).refresh()
+        return result
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @router.post("/api/control/market-data/stop-fixture")
 def control_market_data_stop_fixture(request: Request) -> Dict[str, Any]:
-    return _get_market_data_service(request).stop_fixture()
+    result = _get_market_data_service(request).stop_fixture()
+    _get_broker_readiness_service(request).refresh()
+    return result

@@ -5,7 +5,9 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from app.settings import Settings, load_settings
+import pytest
+
+from app.settings import Settings, SettingsValidationError, load_settings, validate_settings
 
 
 def test_settings_defaults_to_paper_mode_and_fyers_primary():
@@ -65,3 +67,8 @@ def test_settings_supports_execution_mode_and_broker_specific_aliases(tmp_path: 
     assert settings.access_token == "fyers-token"
     assert settings.dhan_client_id == "dhan-id"
     assert settings.dhan_access_token == "dhan-token"
+
+
+def test_settings_validate_rejects_invalid_execution_mode():
+    with pytest.raises(SettingsValidationError):
+        validate_settings(Settings(trading_mode="invalid"))

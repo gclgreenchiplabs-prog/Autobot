@@ -33,6 +33,7 @@ class HealthResponse(BaseModel):
     active_market_data_source: str
     primary_connection_state: str
     standby_connection_state: str
+    brokers: Dict[str, Any]
     last_valid_tick: Optional[str] = None
     quote_cache_size: int = 0
     active_subscriptions: int = 0
@@ -49,6 +50,7 @@ class StateResponse(BaseModel):
     configured_primary_broker: str
     active_execution_broker: str
     standby_broker: str
+    brokers: Dict[str, Any]
     market_data_status: Dict[str, Any]
     events: List[Dict[str, Any]]
     orders: List[Dict[str, Any]]

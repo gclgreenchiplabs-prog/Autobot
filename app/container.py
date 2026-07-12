@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from app.brokers.idempotency import IdempotencyStore
+from app.brokers.readiness import BrokerReadinessService
 from app.brokers.reconciliation import ReconciliationState
 from app.brokers.router import BrokerRouter
 from app.audit import AuditTimelineRepository
@@ -91,6 +92,13 @@ class AppContainer:
             event_bus=self.event_bus,
             audit_repository=self.audit_repository,
         )
+        self.broker_readiness_service = BrokerReadinessService(
+            settings=self.settings,
+            state_store=self.state_store,
+            event_bus=self.event_bus,
+            broker_router=self.broker_router,
+            market_data_service=self.market_data_service,
+        )
         self.status_scheduler = StatusNotificationScheduler(
             notification_service=self.notification_service,
             task_manager=self.task_manager,
@@ -124,4 +132,5 @@ class AppContainer:
         self.service_registry.register("notification_service", self.notification_service)
         self.service_registry.register("instrument_service", self.instrument_service)
         self.service_registry.register("market_data_service", self.market_data_service)
+        self.service_registry.register("broker_readiness_service", self.broker_readiness_service)
         self.service_registry.register("audit_repository", self.audit_repository)

@@ -77,14 +77,14 @@ class TelemetryService:
         if self.settings.is_paper_mode:
             return {
                 "execution_mode": "paper",
-                "configured_primary_broker": "fyers",
+                "configured_primary_broker": self.settings.primary_broker,
                 "active_execution_broker": "paper",
-                "standby_broker": "dhan",
+                "standby_broker": self.settings.standby_broker,
             }
         return {
             "execution_mode": self.settings.trading_mode,
             "configured_primary_broker": self.settings.primary_broker,
-            "active_execution_broker": self.settings.primary_broker,
+            "active_execution_broker": self.settings.execution_broker,
             "standby_broker": self.settings.standby_broker,
         }
 

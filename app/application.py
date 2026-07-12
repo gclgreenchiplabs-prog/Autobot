@@ -33,6 +33,7 @@ def create_app(container: AppContainer | None = None) -> FastAPI:
     app.state.instrument_service = runtime_container.instrument_service
     app.state.market_data_repository = runtime_container.market_data_repository
     app.state.market_data_service = runtime_container.market_data_service
+    app.state.broker_readiness_service = runtime_container.broker_readiness_service
     app.state.audit_repository = runtime_container.audit_repository
 
     add_exception_middleware(app)
@@ -79,6 +80,7 @@ def create_app(container: AppContainer | None = None) -> FastAPI:
             "market_data_candles": dashboard_data["market_data_candles"],
             "market_data_events": dashboard_data["market_data_events"],
             "market_data_heartbeat": dashboard_data["market_data_heartbeat"],
+            "broker_readiness": dashboard_data["broker_readiness"],
             "audit_timeline": dashboard_data["audit_timeline"],
             "health": dashboard_data["health"],
             "session": dashboard_data["session"],

@@ -140,6 +140,35 @@ async function refreshState() {
   ]);
 
   renderCards(
+    'broker-readiness',
+    Object.entries(state.broker_readiness || {}),
+    ([broker, snapshot]) => `
+      <article class="item-card">
+        <div class="item-head">
+          <strong>${broker.toUpperCase()}</strong>
+          <span>${snapshot.status}</span>
+        </div>
+        <div class="item-grid">
+          <span>Configuration ${snapshot.capabilities?.configuration?.status || 'N/A'}</span>
+          <span>Market Data ${snapshot.capabilities?.market_data?.status || 'N/A'}</span>
+          <span>Option Chain ${snapshot.capabilities?.option_chain?.status || 'N/A'}</span>
+          <span>Execution ${snapshot.capabilities?.execution?.status || 'N/A'}</span>
+          <span>Configured ${snapshot.configured ? 'YES' : 'NO'}</span>
+          <span>Enabled ${snapshot.enabled ? 'YES' : 'NO'}</span>
+          <span>Credentials ${snapshot.credentials_present ? 'PRESENT' : 'MISSING'}</span>
+          <span>SDK ${snapshot.sdk_available ? 'AVAILABLE' : 'MISSING'}</span>
+          <span>Authenticated ${snapshot.authenticated ? 'YES' : 'NO'}</span>
+          <span>Connected ${snapshot.connected ? 'YES' : 'NO'}</span>
+          <span>Static IP ${snapshot.static_ip_ready === null || snapshot.static_ip_ready === undefined ? 'N/A' : (snapshot.static_ip_ready ? 'READY' : 'NOT READY')}</span>
+          <span>Active ${snapshot.active ? 'YES' : 'NO'}</span>
+        </div>
+        <p>${snapshot.reason || 'No details provided.'}</p>
+      </article>
+    `,
+    'No broker readiness data.'
+  );
+
+  renderCards(
     'market-data-subscriptions',
     state.market_data_subscriptions,
     (subscription) => `

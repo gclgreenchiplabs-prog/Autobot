@@ -44,6 +44,7 @@ class DashboardService:
         positions = [snapshot.to_dict() for snapshot in self.telemetry_service.build_position_snapshots()]
         recent_exited = [snapshot.to_dict() for snapshot in self.telemetry_service.recent_closed_trades(240)][-5:]
         universe_status = self.instrument_service.universe_status()
+        health = self.health_monitor.snapshot()
         return {
             "account_summary": account,
             "open_positions": positions,
@@ -64,8 +65,9 @@ class DashboardService:
             "market_data_candles": self.market_data_service.candles(limit=20),
             "market_data_events": self.market_data_service.events(limit=20),
             "market_data_heartbeat": self.market_data_service.heartbeat_snapshot(),
+            "broker_readiness": health.get("brokers", {}),
             "audit_timeline": self.audit_repository.list_entries(limit=20),
-            "health": self.health_monitor.snapshot(),
+            "health": health,
             "session": self.scheduler.get_state(),
             "tasks": self.task_manager.get_status(),
         }

@@ -28,6 +28,8 @@ def test_market_data_dashboard_sections_render(tmp_path):
         state = client.get("/api/dashboard-state").json()
 
     assert "Market Data Status" in html
+    assert "Broker Readiness" in html
     assert "Audit Timeline" in html
     assert "market_data_status" in state
+    assert "broker_readiness" in state
     assert "audit_timeline" in state

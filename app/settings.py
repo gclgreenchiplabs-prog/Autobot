@@ -244,6 +244,8 @@ def validate_settings(settings: Settings) -> None:
     except Exception as exc:
         raise SettingsValidationError("unsupported timezone") from exc
 
+    if settings.trading_mode not in {"paper", "live"}:
+        raise SettingsValidationError("invalid execution mode")
     if settings.log_max_bytes <= 0 or settings.log_backup_count <= 0:
         raise SettingsValidationError("invalid log size or backup count")
     if settings.opening_capital <= 0:

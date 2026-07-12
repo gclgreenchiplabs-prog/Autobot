@@ -19,7 +19,7 @@ class BrokerRouter:
     def create_broker(self) -> BaseBroker:
         mode = (self.settings.trading_mode or "paper").lower()
         if mode == "live":
-            primary = (self.settings.primary_broker or "fyers").lower()
+            primary = (self.settings.execution_broker or self.settings.primary_broker or "fyers").lower()
             if primary == "dhan":
                 return DhanAdapter(self.settings)
             return FyersAdapter(self.settings)
