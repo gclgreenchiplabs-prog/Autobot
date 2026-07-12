@@ -9,6 +9,7 @@ from app.database.connection import DatabaseConnection
 from app.database.migrations import MigrationRunner
 from app.database.repository import Repository
 from app.event_bus import EventBus
+from app.execution import ExecutionService
 from app.health import HealthMonitor
 from app.instruments import InstrumentCache, InstrumentService
 from app.instruments.repository import InstrumentRepository
@@ -107,6 +108,17 @@ class AppContainer:
             broker_router=self.broker_router,
             market_data_service=self.market_data_service,
         )
+        self.execution_service = ExecutionService(
+            settings=self.settings,
+            state_store=self.state_store,
+            repository=self.repository,
+            event_bus=self.event_bus,
+            broker_router=self.broker_router,
+            telemetry_service=self.telemetry_service,
+            scheduler=self.scheduler,
+            broker_readiness_service=self.broker_readiness_service,
+            market_data_service=self.market_data_service,
+        )
         self.status_scheduler = StatusNotificationScheduler(
             notification_service=self.notification_service,
             task_manager=self.task_manager,
@@ -128,6 +140,7 @@ class AppContainer:
             health_monitor=self.health_monitor,
             scheduler=self.scheduler,
             task_manager=self.task_manager,
+            execution_service=self.execution_service,
         )
 
     def wire_runtime(self) -> None:
@@ -143,4 +156,5 @@ class AppContainer:
         self.service_registry.register("market_data_service", self.market_data_service)
         self.service_registry.register("scanner_engine", self.scanner_engine)
         self.service_registry.register("broker_readiness_service", self.broker_readiness_service)
+        self.service_registry.register("execution_service", self.execution_service)
         self.service_registry.register("audit_repository", self.audit_repository)

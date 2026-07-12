@@ -35,6 +35,7 @@ def create_app(container: AppContainer | None = None) -> FastAPI:
     app.state.market_data_service = runtime_container.market_data_service
     app.state.scanner_engine = runtime_container.scanner_engine
     app.state.broker_readiness_service = runtime_container.broker_readiness_service
+    app.state.execution_service = runtime_container.execution_service
     app.state.audit_repository = runtime_container.audit_repository
 
     add_exception_middleware(app)
@@ -100,6 +101,7 @@ def create_app(container: AppContainer | None = None) -> FastAPI:
             "health": dashboard_data["health"],
             "session": dashboard_data["session"],
             "tasks": dashboard_data["tasks"],
+            "execution_status": dashboard_data["execution_status"],
         }
 
     return app

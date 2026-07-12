@@ -4,8 +4,17 @@ from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Body, HTTPException, Query, Request
 
-from app.api.schemas import HealthResponse, InstrumentImportRequest, MarketDataControlRequest, MarketDataSubscriptionRequest, StateResponse
+from app.api.schemas import (
+    ExecutionExitRequest,
+    ExecutionOrderRequest,
+    HealthResponse,
+    InstrumentImportRequest,
+    MarketDataControlRequest,
+    MarketDataSubscriptionRequest,
+    StateResponse,
+)
 from app.container import AppContainer
+from app.models import OrderRequest
 
 router = APIRouter()
 
@@ -48,6 +57,10 @@ def _get_broker_readiness_service(request: Request) -> Any:
 
 def _get_audit_repository(request: Request) -> Any:
     return request.app.state.audit_repository
+
+
+def _get_execution_service(request: Request) -> Any:
+    return request.app.state.execution_service
 
 
 def _broker_state(container: AppContainer) -> Dict[str, Any]:
@@ -103,6 +116,8 @@ def health(request: Request) -> HealthResponse:
             "resume",
             "scan",
             "kill-switch",
+            "order",
+            "exit",
             "send-status-now",
             "import-instruments",
             "market-data/connect",
@@ -520,6 +535,11 @@ def telemetry_day_summary(request: Request) -> Dict[str, Any]:
     return _get_telemetry_service(request).build_day_summary().to_dict()
 
 
+@router.get("/api/execution/status")
+def execution_status(request: Request) -> Dict[str, Any]:
+    return _get_execution_service(request).status()
+
+
 @router.post("/api/control/start")
 def control_start(request: Request) -> Dict[str, Any]:
     return _get_control_service(request).apply("start")
@@ -550,6 +570,38 @@ def control_scan(request: Request) -> Dict[str, Any]:
 @router.post("/api/control/kill-switch")
 def control_kill_switch(request: Request) -> Dict[str, Any]:
     return _get_control_service(request).apply("kill-switch")
+
+
+@router.post("/api/control/order")
+def control_place_order(request: Request, payload: ExecutionOrderRequest) -> Dict[str, Any]:
+    try:
+        result = _get_execution_service(request).place_order(
+            OrderRequest(
+                symbol=payload.symbol,
+                quantity=payload.quantity,
+                action=payload.action,
+                price=payload.price,
+            ),
+            idempotency_key=payload.idempotency_key,
+        )
+        _get_broker_readiness_service(request).refresh()
+        return result
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/api/control/exit")
+def control_exit_position(request: Request, payload: ExecutionExitRequest) -> Dict[str, Any]:
+    try:
+        result = _get_execution_service(request).exit_position(
+            payload.trade_id,
+            exit_price=payload.exit_price,
+            reason=payload.reason,
+        )
+        _get_broker_readiness_service(request).refresh()
+        return result
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @router.post("/api/control/send-status-now")

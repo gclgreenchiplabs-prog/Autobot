@@ -54,6 +54,17 @@ def _side_multiplier(side: Any) -> int:
     return 1
 
 
+def _net_trade_pnl(trade: Dict[str, Any]) -> float:
+    explicit = trade.get("net_pnl")
+    if explicit is not None:
+        return round(_as_float(explicit), 2)
+    gross = _as_float(trade.get("gross_pnl", trade.get("trade_pnl", 0.0)))
+    charges = _as_float(trade.get("charges_total"))
+    if charges == 0.0:
+        charges = _as_float((trade.get("entry_charges") or {}).get("total")) + _as_float((trade.get("exit_charges") or {}).get("total"))
+    return round(gross - charges, 2)
+
+
 class TelemetryService:
     def __init__(
         self,
@@ -132,13 +143,13 @@ class TelemetryService:
         opening_capital = _as_float(account_state.get("opening_capital"), self.settings.opening_capital)
         capital_reserved = _as_float(account_state.get("capital_reserved"))
         capital_used_day = round(sum(self._position_capital_used(position) for position in positions), 2)
-        realized_pnl = round(sum(_as_float(trade.get("net_pnl", trade.get("trade_pnl", 0.0))) for trade in closed_trades), 2)
+        realized_pnl = round(sum(_net_trade_pnl(trade) for trade in closed_trades), 2)
         unrealized_pnl = round(sum(self._position_current_pnl(position) for position in positions), 2)
         total_day_pnl = round(realized_pnl + unrealized_pnl, 2)
         account_equity = round(opening_capital + total_day_pnl, 2)
         capital_available = round(opening_capital - capital_used_day - capital_reserved + total_day_pnl, 2)
-        wins = sum(1 for trade in closed_trades if _as_float(trade.get("net_pnl", trade.get("trade_pnl", 0.0))) > 0)
-        losses = sum(1 for trade in closed_trades if _as_float(trade.get("net_pnl", trade.get("trade_pnl", 0.0))) < 0)
+        wins = sum(1 for trade in closed_trades if _net_trade_pnl(trade) > 0)
+        losses = sum(1 for trade in closed_trades if _net_trade_pnl(trade) < 0)
 
         return AccountSnapshot(
             opening_capital=round(opening_capital, 2),
@@ -266,7 +277,7 @@ class TelemetryService:
             hold_duration_seconds = 0
             if entry_timestamp and exit_timestamp:
                 hold_duration_seconds = int((exit_timestamp.astimezone(timezone.utc) - entry_timestamp.astimezone(timezone.utc)).total_seconds())
-            realized_pnl = round(_as_float(trade.get("net_pnl", trade.get("trade_pnl", 0.0))), 2)
+            realized_pnl = _net_trade_pnl(trade)
             snapshots.append(
                 TradeSnapshot(
                     trade_id=str(trade.get("trade_id") or trade.get("symbol") or "closed-trade"),

@@ -198,6 +198,11 @@ class BrokerCapabilityEvaluator:
             return self._record("execution", False, "DISABLED", "EXPLICIT_LIVE_CONFIRMATION is false.")
         if not enabled:
             return self._record("execution", False, "DISABLED", "Broker execution capability is disabled.")
+        if self.execution_active and self.broker != self.settings.primary_broker:
+            if not self.settings.enable_execution_failover:
+                return self._record("execution", True, "DISABLED", "ENABLE_EXECUTION_FAILOVER is false.")
+            if self.settings.failover_requires_manual_approval and not self.settings.execution_failover_approved:
+                return self._record("execution", True, "DISABLED", "EXECUTION_FAILOVER_APPROVED is false.")
         if self.broker == "dhan" and not self.settings.dhan_order_api_enable:
             return self._record("execution", True, "DISABLED", "DHAN_ORDER_API_ENABLE is false.")
         if self.broker == "dhan" and not self.settings.dhan_static_ip_ready:

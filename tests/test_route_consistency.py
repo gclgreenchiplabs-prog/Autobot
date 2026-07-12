@@ -51,12 +51,15 @@ REQUIRED_ROUTES = [
     "/api/scanner/watchlist",
     "/api/scanner/avoid",
     "/api/scanner/regime",
+    "/api/execution/status",
     "/api/control/start",
     "/api/control/stop",
     "/api/control/pause",
     "/api/control/resume",
     "/api/control/scan",
     "/api/control/kill-switch",
+    "/api/control/order",
+    "/api/control/exit",
     "/api/control/import-instruments",
     "/api/control/market-data/connect",
     "/api/control/market-data/disconnect",
@@ -82,6 +85,7 @@ def test_canonical_app_is_shared_and_routes_are_unique():
     assert canonical_app.state.telemetry_service is canonical_app.state.container.telemetry_service
     assert canonical_app.state.notification_service is canonical_app.state.container.notification_service
     assert canonical_app.state.market_data_service is canonical_app.state.container.market_data_service
+    assert canonical_app.state.execution_service is canonical_app.state.container.execution_service
     assert canonical_app.state.dashboard_service.telemetry_service is canonical_app.state.container.telemetry_service
 
     route_counts = Counter(route.path for route in canonical_app.routes if hasattr(route, "path"))

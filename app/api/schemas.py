@@ -87,3 +87,17 @@ class MarketDataSubscriptionRequest(BaseModel):
 
 class MarketDataControlRequest(BaseModel):
     source: Optional[str] = None
+
+
+class ExecutionOrderRequest(BaseModel):
+    symbol: str
+    quantity: int
+    action: str
+    price: Optional[float] = None
+    idempotency_key: Optional[str] = None
+
+
+class ExecutionExitRequest(BaseModel):
+    trade_id: str
+    exit_price: Optional[float] = None
+    reason: str = "manual exit"

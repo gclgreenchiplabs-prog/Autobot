@@ -7,5 +7,7 @@
 *.html text eol=lf
 *.json text eol=lf
 *.md text eol=lf
+*.env text eol=lf
+*.env.example text eol=lf
 *.ps1 text eol=crlf
 *.sh text eol=lf

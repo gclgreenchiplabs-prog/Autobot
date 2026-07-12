@@ -133,6 +133,8 @@ def test_dhan_live_execution_requires_order_api_and_static_ip(tmp_path: Path) ->
         trading_mode="live",
         live_order_enable=True,
         explicit_live_confirmation=True,
+        enable_execution_failover=True,
+        execution_failover_approved=True,
         primary_broker="fyers",
         standby_broker="dhan",
         execution_broker="dhan",
@@ -163,6 +165,8 @@ def test_dhan_live_execution_requires_static_ip_when_order_api_is_enabled(tmp_pa
         trading_mode="live",
         live_order_enable=True,
         explicit_live_confirmation=True,
+        enable_execution_failover=True,
+        execution_failover_approved=True,
         execution_broker="dhan",
         dhan_configured=True,
         dhan_execution_enable=True,
@@ -179,6 +183,35 @@ def test_dhan_live_execution_requires_static_ip_when_order_api_is_enabled(tmp_pa
     assert execution["status"] == "DISABLED"
     assert execution["reason"] == "DHAN_STATIC_IP_READY is false."
     assert snapshot["execution_ready"] is False
+
+
+def test_dhan_live_execution_requires_failover_approval_for_standby_use(tmp_path: Path) -> None:
+    settings = Settings(
+        database_path=str(tmp_path / "live_exec_dhan_failover_blocked.db"),
+        forced_test_mode=True,
+        enable_notifications=False,
+        trading_mode="live",
+        live_order_enable=True,
+        explicit_live_confirmation=True,
+        enable_execution_failover=True,
+        execution_failover_approved=False,
+        primary_broker="fyers",
+        standby_broker="dhan",
+        execution_broker="dhan",
+        dhan_configured=True,
+        dhan_execution_enable=True,
+        dhan_client_id="dhan-client",
+        dhan_access_token="dhan-token",
+        dhan_order_api_enable=True,
+        dhan_static_ip_ready=True,
+    )
+
+    container = AppContainer(settings=settings)
+    snapshot = container.broker_readiness_service.snapshots()["dhan"]
+    execution = snapshot["capabilities"]["execution"]
+
+    assert execution["status"] == "DISABLED"
+    assert execution["reason"] == "EXECUTION_FAILOVER_APPROVED is false."
 
 
 def test_broker_credentials_never_appear_in_api_dashboard_or_notifications(tmp_path: Path) -> None:

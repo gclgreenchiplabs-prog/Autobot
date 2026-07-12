@@ -49,6 +49,9 @@ def test_settings_supports_execution_mode_and_broker_specific_aliases(tmp_path: 
         "DHAN_ACCESS_TOKEN=dhan-token\n"
         "LIVE_ORDER_ENABLE=false\n"
         "LIVE_MARKET_DATA_ENABLE=false\n"
+        "EXECUTION_FAILOVER_APPROVED=true\n"
+        "BROKERAGE_FLAT_PER_ORDER=20\n"
+        "GST_PCT=18\n"
         "PRIMARY_MARKET_DATA_BROKER=FYERS\n"
         "STANDBY_MARKET_DATA_BROKER=DHAN\n",
         encoding="utf-8",
@@ -67,8 +70,16 @@ def test_settings_supports_execution_mode_and_broker_specific_aliases(tmp_path: 
     assert settings.access_token == "fyers-token"
     assert settings.dhan_client_id == "dhan-id"
     assert settings.dhan_access_token == "dhan-token"
+    assert settings.execution_failover_approved is True
+    assert settings.brokerage_flat_per_order == 20.0
+    assert settings.gst_pct == 18.0
 
 
 def test_settings_validate_rejects_invalid_execution_mode():
     with pytest.raises(SettingsValidationError):
         validate_settings(Settings(trading_mode="invalid"))
+
+
+def test_settings_validate_rejects_negative_charge_configuration():
+    with pytest.raises(SettingsValidationError):
+        validate_settings(Settings(brokerage_flat_per_order=-1.0))

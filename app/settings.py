@@ -85,6 +85,7 @@ class Settings:
     standby_market_data_broker: str = "dhan"
     enable_market_data_failover: bool = False
     enable_execution_failover: bool = False
+    execution_failover_approved: bool = False
     failover_requires_manual_approval: bool = True
     fyers_market_data_enable: bool = False
     dhan_market_data_enable: bool = False
@@ -105,6 +106,13 @@ class Settings:
     fixture_market_data_path: str = ""
     fixture_tick_interval_ms: int = 1000
     fixture_auto_start: bool = False
+    brokerage_flat_per_order: float = 0.0
+    brokerage_pct: float = 0.0
+    stt_sell_pct: float = 0.0
+    exchange_txn_pct: float = 0.0
+    sebi_charges_pct: float = 0.0
+    gst_pct: float = 18.0
+    stamp_duty_buy_pct: float = 0.0
 
     @property
     def is_paper_mode(self) -> bool:
@@ -202,6 +210,7 @@ def load_settings(env_path: Optional[os.PathLike[str] | str | Path] = None) -> S
         standby_market_data_broker=_value("STANDBY_MARKET_DATA_BROKER", default="DHAN").strip().lower(),
         enable_market_data_failover=_bool("ENABLE_MARKET_DATA_FAILOVER"),
         enable_execution_failover=_bool("ENABLE_EXECUTION_FAILOVER"),
+        execution_failover_approved=_bool("EXECUTION_FAILOVER_APPROVED"),
         failover_requires_manual_approval=_bool("FAILOVER_REQUIRES_MANUAL_APPROVAL", default="true"),
         fyers_market_data_enable=_bool("FYERS_MARKET_DATA_ENABLE"),
         dhan_market_data_enable=_bool("DHAN_MARKET_DATA_ENABLE"),
@@ -222,6 +231,13 @@ def load_settings(env_path: Optional[os.PathLike[str] | str | Path] = None) -> S
         fixture_market_data_path=_value("FIXTURE_MARKET_DATA_PATH").strip(),
         fixture_tick_interval_ms=int(_value("FIXTURE_TICK_INTERVAL_MS", default="1000")),
         fixture_auto_start=_bool("FIXTURE_AUTO_START"),
+        brokerage_flat_per_order=float(_value("BROKERAGE_FLAT_PER_ORDER", default="0")),
+        brokerage_pct=float(_value("BROKERAGE_PCT", default="0")),
+        stt_sell_pct=float(_value("STT_SELL_PCT", default="0")),
+        exchange_txn_pct=float(_value("EXCHANGE_TXN_PCT", default="0")),
+        sebi_charges_pct=float(_value("SEBI_CHARGES_PCT", default="0")),
+        gst_pct=float(_value("GST_PCT", default="18")),
+        stamp_duty_buy_pct=float(_value("STAMP_DUTY_BUY_PCT", default="0")),
     )
 
 
@@ -292,6 +308,19 @@ def validate_settings(settings: Settings) -> None:
         raise SettingsValidationError("invalid market-data retention configuration")
     if settings.fixture_tick_interval_ms <= 0:
         raise SettingsValidationError("invalid fixture tick interval")
+    if any(
+        value < 0
+        for value in [
+            settings.brokerage_flat_per_order,
+            settings.brokerage_pct,
+            settings.stt_sell_pct,
+            settings.exchange_txn_pct,
+            settings.sebi_charges_pct,
+            settings.gst_pct,
+            settings.stamp_duty_buy_pct,
+        ]
+    ):
+        raise SettingsValidationError("broker charge configuration cannot be negative")
     if not any(
         [
             settings.enable_1m_candles,

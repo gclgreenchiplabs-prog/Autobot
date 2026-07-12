@@ -13,6 +13,7 @@ from app.scheduler.session_scheduler import SessionScheduler
 from app.tasks.manager import BackgroundTaskManager
 from app.telemetry import TelemetryService
 from app.audit.repository import AuditTimelineRepository
+from app.execution.service import ExecutionService
 
 
 class DashboardService:
@@ -29,6 +30,7 @@ class DashboardService:
         health_monitor: HealthMonitor,
         scheduler: SessionScheduler,
         task_manager: BackgroundTaskManager,
+        execution_service: ExecutionService,
     ) -> None:
         self.telemetry_service = telemetry_service
         self.notification_service = notification_service
@@ -41,6 +43,7 @@ class DashboardService:
         self.health_monitor = health_monitor
         self.scheduler = scheduler
         self.task_manager = task_manager
+        self.execution_service = execution_service
 
     def get_state(self) -> Dict[str, Any]:
         account = self.telemetry_service.build_account_snapshot(reason="dashboard").to_dict()
@@ -88,4 +91,5 @@ class DashboardService:
             "health": health,
             "session": self.scheduler.get_state(),
             "tasks": self.task_manager.get_status(),
+            "execution_status": self.execution_service.status(),
         }
