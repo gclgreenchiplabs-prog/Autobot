@@ -390,11 +390,24 @@ class Repository:
                 preferred_exchange TEXT NOT NULL,
                 data_mode TEXT NOT NULL,
                 eligible INTEGER NOT NULL,
+                candidate_bucket TEXT NOT NULL DEFAULT 'general',
+                decision TEXT NOT NULL DEFAULT 'WATCH',
+                risk_level TEXT NOT NULL DEFAULT 'MEDIUM',
+                payload_json TEXT NOT NULL DEFAULT '{}',
                 rejection_reasons_json TEXT NOT NULL,
                 selection_reasons_json TEXT NOT NULL,
                 created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY(company_id) REFERENCES companies(company_id) ON DELETE CASCADE,
                 FOREIGN KEY(instrument_id) REFERENCES instruments(instrument_id) ON DELETE CASCADE
+            );
+            CREATE TABLE IF NOT EXISTS scanner_runs (
+                run_id TEXT PRIMARY KEY,
+                started_at TEXT NOT NULL,
+                completed_at TEXT,
+                market_regime TEXT NOT NULL,
+                summary_json TEXT NOT NULL,
+                created_at TEXT NOT NULL
             );
 
             CREATE INDEX IF NOT EXISTS idx_companies_isin ON companies(isin);

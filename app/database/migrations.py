@@ -530,6 +530,27 @@ class MigrationRunner:
                 CREATE INDEX IF NOT EXISTS idx_decision_timeline_timestamp_utc ON decision_timeline(timestamp_utc);
                 """,
             ),
+            (
+                "005_scanner_ai_engine",
+                """
+                ALTER TABLE scanner_candidates ADD COLUMN candidate_bucket TEXT NOT NULL DEFAULT 'general';
+                ALTER TABLE scanner_candidates ADD COLUMN decision TEXT NOT NULL DEFAULT 'WATCH';
+                ALTER TABLE scanner_candidates ADD COLUMN risk_level TEXT NOT NULL DEFAULT 'MEDIUM';
+                ALTER TABLE scanner_candidates ADD COLUMN payload_json TEXT NOT NULL DEFAULT '{}';
+                ALTER TABLE scanner_candidates ADD COLUMN updated_at TEXT NOT NULL DEFAULT '';
+                CREATE INDEX IF NOT EXISTS idx_scanner_candidates_scope ON scanner_candidates(strategy_scope);
+                CREATE INDEX IF NOT EXISTS idx_scanner_candidates_bucket ON scanner_candidates(candidate_bucket);
+                CREATE INDEX IF NOT EXISTS idx_scanner_candidates_score ON scanner_candidates(score);
+                CREATE TABLE IF NOT EXISTS scanner_runs (
+                    run_id TEXT PRIMARY KEY,
+                    started_at TEXT NOT NULL,
+                    completed_at TEXT,
+                    market_regime TEXT NOT NULL,
+                    summary_json TEXT NOT NULL,
+                    created_at TEXT NOT NULL
+                );
+                """,
+            ),
         ]
 
     def current_version(self) -> Optional[str]:
@@ -544,7 +565,14 @@ class MigrationRunner:
             existing = conn.execute("SELECT 1 FROM schema_migrations WHERE version = ?", (version,)).fetchone()
             if existing:
                 continue
-            conn.executescript(sql)
+            statements = [statement.strip() for statement in sql.split(";") if statement.strip()]
+            for statement in statements:
+                try:
+                    conn.execute(statement)
+                except Exception as exc:
+                    if version == "005_scanner_ai_engine" and "duplicate column name" in str(exc).lower():
+                        continue
+                    raise
             conn.execute(
                 "INSERT INTO schema_migrations(version, applied_at) VALUES(?, ?)",
                 (version, datetime.now(timezone.utc).isoformat()),

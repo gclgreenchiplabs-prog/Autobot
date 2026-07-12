@@ -38,6 +38,10 @@ def _get_market_data_service(request: Request) -> Any:
     return request.app.state.market_data_service
 
 
+def _get_scanner_engine(request: Request) -> Any:
+    return request.app.state.scanner_engine
+
+
 def _get_broker_readiness_service(request: Request) -> Any:
     return request.app.state.broker_readiness_service
 
@@ -402,7 +406,53 @@ def audit_timeline(
 
 @router.get("/api/scanner/candidates")
 def scanner_candidates(request: Request) -> List[Dict[str, Any]]:
-    return _get_instrument_service(request).repository.list_candidates()
+    return _get_scanner_engine(request).refresh(reason="api")["all_candidates"]
+
+
+@router.get("/api/scanner/summary")
+def scanner_summary(request: Request) -> Dict[str, Any]:
+    state = _get_scanner_engine(request).refresh(reason="api")
+    return state["summary"]
+
+
+@router.get("/api/scanner/intraday")
+def scanner_intraday(request: Request) -> List[Dict[str, Any]]:
+    return _get_scanner_engine(request).refresh(reason="api")["intraday"]
+
+
+@router.get("/api/scanner/btst")
+def scanner_btst(request: Request) -> List[Dict[str, Any]]:
+    return _get_scanner_engine(request).refresh(reason="api")["btst"]
+
+
+@router.get("/api/scanner/swing")
+def scanner_swing(request: Request) -> List[Dict[str, Any]]:
+    return _get_scanner_engine(request).refresh(reason="api")["swing"]
+
+
+@router.get("/api/scanner/portfolio")
+def scanner_portfolio(request: Request) -> List[Dict[str, Any]]:
+    return _get_scanner_engine(request).refresh(reason="api")["portfolio"]
+
+
+@router.get("/api/scanner/options")
+def scanner_options(request: Request) -> List[Dict[str, Any]]:
+    return _get_scanner_engine(request).refresh(reason="api")["options"]
+
+
+@router.get("/api/scanner/watchlist")
+def scanner_watchlist(request: Request) -> List[Dict[str, Any]]:
+    return _get_scanner_engine(request).refresh(reason="api")["watchlist"]
+
+
+@router.get("/api/scanner/avoid")
+def scanner_avoid(request: Request) -> List[Dict[str, Any]]:
+    return _get_scanner_engine(request).refresh(reason="api")["avoid"]
+
+
+@router.get("/api/scanner/regime")
+def scanner_regime(request: Request) -> Dict[str, Any]:
+    return _get_scanner_engine(request).refresh(reason="api")["regime"]
 
 
 @router.get("/api/notifications")
@@ -492,7 +542,9 @@ def control_resume(request: Request) -> Dict[str, Any]:
 
 @router.post("/api/control/scan")
 def control_scan(request: Request) -> Dict[str, Any]:
-    return _get_control_service(request).apply("scan")
+    payload = _get_control_service(request).apply("scan")
+    payload["scanner"] = _get_scanner_engine(request).refresh(reason="control-scan")["summary"]
+    return payload
 
 
 @router.post("/api/control/kill-switch")
@@ -511,7 +563,9 @@ def control_send_status_now(request: Request) -> Dict[str, Any]:
 @router.post("/api/control/import-instruments")
 def control_import_instruments(request: Request, payload: Optional[InstrumentImportRequest] = Body(default=None)) -> Dict[str, Any]:
     body = payload.model_dump(exclude_none=True) if payload is not None else {}
-    return _get_instrument_service(request).import_instruments(body)
+    result = _get_instrument_service(request).import_instruments(body)
+    _get_scanner_engine(request).refresh(reason="import")
+    return result
 
 
 @router.post("/api/control/market-data/connect")

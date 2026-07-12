@@ -26,6 +26,7 @@ from app.notifications import (
 from app.api.controls import ControlService
 from app.scheduler.market_clock import MarketClock
 from app.scheduler.session_scheduler import SessionScheduler
+from app.scanners import ScannerEngine
 from app.services.registry import ServiceRegistry
 from app.state_store import StateStore
 from app.tasks.manager import BackgroundTaskManager
@@ -92,6 +93,13 @@ class AppContainer:
             event_bus=self.event_bus,
             audit_repository=self.audit_repository,
         )
+        self.scanner_engine = ScannerEngine(
+            settings=self.settings,
+            state_store=self.state_store,
+            instrument_repository=self.instrument_repository,
+            market_data_repository=self.market_data_repository,
+            event_bus=self.event_bus,
+        )
         self.broker_readiness_service = BrokerReadinessService(
             settings=self.settings,
             state_store=self.state_store,
@@ -114,6 +122,7 @@ class AppContainer:
             instrument_service=self.instrument_service,
             market_data_repository=self.market_data_repository,
             market_data_service=self.market_data_service,
+            scanner_engine=self.scanner_engine,
             audit_repository=self.audit_repository,
             event_bus=self.event_bus,
             health_monitor=self.health_monitor,
@@ -132,5 +141,6 @@ class AppContainer:
         self.service_registry.register("notification_service", self.notification_service)
         self.service_registry.register("instrument_service", self.instrument_service)
         self.service_registry.register("market_data_service", self.market_data_service)
+        self.service_registry.register("scanner_engine", self.scanner_engine)
         self.service_registry.register("broker_readiness_service", self.broker_readiness_service)
         self.service_registry.register("audit_repository", self.audit_repository)

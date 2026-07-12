@@ -156,18 +156,23 @@ class InstrumentRepository:
                     INSERT INTO scanner_candidates(
                         candidate_id, company_id, instrument_id, symbol, exchange, direction, instrument_type, strategy_scope, score,
                         confidence, liquidity_score, data_quality_score, fno_eligible, preferred_exchange, data_mode, eligible,
-                        rejection_reasons_json, selection_reasons_json, created_at
+                        candidate_bucket, decision, risk_level, payload_json, rejection_reasons_json, selection_reasons_json, created_at, updated_at
                     ) VALUES(
                         :candidate_id, :company_id, :instrument_id, :symbol, :exchange, :direction, :instrument_type, :strategy_scope, :score,
                         :confidence, :liquidity_score, :data_quality_score, :fno_eligible, :preferred_exchange, :data_mode, :eligible,
-                        :rejection_reasons_json, :selection_reasons_json, :created_at
+                        :candidate_bucket, :decision, :risk_level, :payload_json, :rejection_reasons_json, :selection_reasons_json, :created_at, :updated_at
                     )
                     """,
                     [
                         {
                             **item,
+                            "candidate_bucket": item.get("candidate_bucket", "foundation"),
+                            "decision": item.get("decision", "WATCH"),
+                            "risk_level": item.get("risk_level", "MEDIUM"),
+                            "payload_json": json.dumps(item.get("payload_json", {})),
                             "rejection_reasons_json": json.dumps(item["rejection_reasons_json"]),
                             "selection_reasons_json": json.dumps(item["selection_reasons_json"]),
+                            "updated_at": item.get("updated_at", item.get("created_at")),
                         }
                         for item in bundle["candidates"]
                     ],
@@ -250,6 +255,7 @@ class InstrumentRepository:
                 c.company_name,
                 c.sector,
                 c.industry,
+                c.market_cap_category,
                 q.data_mode,
                 q.timestamp_utc AS quote_timestamp_utc,
                 l.liquidity_score,
@@ -279,6 +285,7 @@ class InstrumentRepository:
                 c.company_name,
                 c.sector,
                 c.industry,
+                c.market_cap_category,
                 q.data_mode,
                 q.timestamp_utc AS quote_timestamp_utc,
                 l.liquidity_score,
@@ -378,10 +385,60 @@ class InstrumentRepository:
 
     def list_candidates(self) -> List[Dict[str, Any]]:
         rows = self._conn.execute("SELECT * FROM scanner_candidates ORDER BY eligible DESC, score DESC, symbol").fetchall()
-        data = []
-        for row in rows:
-            item = dict(row)
-            item["rejection_reasons_json"] = json.loads(item["rejection_reasons_json"] or "[]")
-            item["selection_reasons_json"] = json.loads(item["selection_reasons_json"] or "[]")
-            data.append(item)
-        return data
+        return [self._candidate_from_row(row) for row in rows]
+
+    def replace_candidates(self, candidates: List[Dict[str, Any]]) -> None:
+        with self.repository.database.transaction() as txn:
+            txn.execute("DELETE FROM scanner_candidates")
+            txn.executemany(
+                """
+                INSERT INTO scanner_candidates(
+                    candidate_id, company_id, instrument_id, symbol, exchange, direction, instrument_type, strategy_scope, score,
+                    confidence, liquidity_score, data_quality_score, fno_eligible, preferred_exchange, data_mode, eligible,
+                    candidate_bucket, decision, risk_level, payload_json, rejection_reasons_json, selection_reasons_json, created_at, updated_at
+                ) VALUES(
+                    :candidate_id, :company_id, :instrument_id, :symbol, :exchange, :direction, :instrument_type, :strategy_scope, :score,
+                    :confidence, :liquidity_score, :data_quality_score, :fno_eligible, :preferred_exchange, :data_mode, :eligible,
+                    :candidate_bucket, :decision, :risk_level, :payload_json, :rejection_reasons_json, :selection_reasons_json, :created_at, :updated_at
+                )
+                """,
+                [
+                    {
+                        **item,
+                        "candidate_bucket": item.get("candidate_bucket", "general"),
+                        "decision": item.get("decision", "WATCH"),
+                        "risk_level": item.get("risk_level", "MEDIUM"),
+                        "payload_json": json.dumps(item.get("payload_json", {})),
+                        "rejection_reasons_json": json.dumps(item.get("rejection_reasons_json", [])),
+                        "selection_reasons_json": json.dumps(item.get("selection_reasons_json", [])),
+                        "updated_at": item.get("updated_at", item.get("created_at")),
+                    }
+                    for item in candidates
+                ],
+            )
+
+    def save_scanner_run(self, *, run_id: str, started_at: str, completed_at: str, market_regime: str, summary: Dict[str, Any]) -> None:
+        self._conn.execute(
+            """
+            INSERT OR REPLACE INTO scanner_runs(run_id, started_at, completed_at, market_regime, summary_json, created_at)
+            VALUES(?, ?, ?, ?, ?, ?)
+            """,
+            (run_id, started_at, completed_at, market_regime, json.dumps(summary), started_at),
+        )
+
+    def latest_scanner_run(self) -> Optional[Dict[str, Any]]:
+        row = self._conn.execute("SELECT * FROM scanner_runs ORDER BY started_at DESC LIMIT 1").fetchone()
+        if row is None:
+            return None
+        item = dict(row)
+        item["summary_json"] = json.loads(item["summary_json"] or "{}")
+        return item
+
+    def _candidate_from_row(self, row: Any) -> Dict[str, Any]:
+        item = dict(row)
+        item["payload_json"] = json.loads(item.get("payload_json") or "{}")
+        item["rejection_reasons_json"] = json.loads(item["rejection_reasons_json"] or "[]")
+        item["selection_reasons_json"] = json.loads(item["selection_reasons_json"] or "[]")
+        for key, value in item["payload_json"].items():
+            item.setdefault(key, value)
+        return item

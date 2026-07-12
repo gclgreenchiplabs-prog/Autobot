@@ -17,4 +17,5 @@ def test_websocket_streams_state():
             assert 'lifecycle' in message
             assert 'events' in message
             assert 'market_data_status' in message
+            assert 'scanner_summary' in message
             assert 'quote_update' in message

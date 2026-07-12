@@ -33,6 +33,7 @@ def create_app(container: AppContainer | None = None) -> FastAPI:
     app.state.instrument_service = runtime_container.instrument_service
     app.state.market_data_repository = runtime_container.market_data_repository
     app.state.market_data_service = runtime_container.market_data_service
+    app.state.scanner_engine = runtime_container.scanner_engine
     app.state.broker_readiness_service = runtime_container.broker_readiness_service
     app.state.audit_repository = runtime_container.audit_repository
 
@@ -80,6 +81,20 @@ def create_app(container: AppContainer | None = None) -> FastAPI:
             "market_data_candles": dashboard_data["market_data_candles"],
             "market_data_events": dashboard_data["market_data_events"],
             "market_data_heartbeat": dashboard_data["market_data_heartbeat"],
+            "scanner_summary": dashboard_data["scanner_summary"],
+            "scanner_regime": dashboard_data["scanner_regime"],
+            "scanner_intraday": dashboard_data["scanner_intraday"],
+            "scanner_btst": dashboard_data["scanner_btst"],
+            "scanner_swing": dashboard_data["scanner_swing"],
+            "scanner_portfolio": dashboard_data["scanner_portfolio"],
+            "scanner_options": dashboard_data["scanner_options"],
+            "scanner_watchlist": dashboard_data["scanner_watchlist"],
+            "scanner_avoid": dashboard_data["scanner_avoid"],
+            "scanner_corporate_events": dashboard_data["scanner_corporate_events"],
+            "scanner_sector_rotation": dashboard_data["scanner_sector_rotation"],
+            "scanner_risk_heatmap": dashboard_data["scanner_risk_heatmap"],
+            "scanner_top_gainers": dashboard_data["scanner_top_gainers"],
+            "scanner_top_losers": dashboard_data["scanner_top_losers"],
             "broker_readiness": dashboard_data["broker_readiness"],
             "audit_timeline": dashboard_data["audit_timeline"],
             "health": dashboard_data["health"],

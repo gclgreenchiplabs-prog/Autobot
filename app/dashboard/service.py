@@ -8,6 +8,7 @@ from app.instruments.service import InstrumentService
 from app.market_data.repository import MarketDataRepository
 from app.market_data.service import MarketDataService
 from app.notifications.service import NotificationService
+from app.scanners.scanner_engine import ScannerEngine
 from app.scheduler.session_scheduler import SessionScheduler
 from app.tasks.manager import BackgroundTaskManager
 from app.telemetry import TelemetryService
@@ -22,6 +23,7 @@ class DashboardService:
         instrument_service: InstrumentService,
         market_data_repository: MarketDataRepository,
         market_data_service: MarketDataService,
+        scanner_engine: ScannerEngine,
         audit_repository: AuditTimelineRepository,
         event_bus: EventBus,
         health_monitor: HealthMonitor,
@@ -33,6 +35,7 @@ class DashboardService:
         self.instrument_service = instrument_service
         self.market_data_repository = market_data_repository
         self.market_data_service = market_data_service
+        self.scanner_engine = scanner_engine
         self.audit_repository = audit_repository
         self.event_bus = event_bus
         self.health_monitor = health_monitor
@@ -45,6 +48,7 @@ class DashboardService:
         recent_exited = [snapshot.to_dict() for snapshot in self.telemetry_service.recent_closed_trades(240)][-5:]
         universe_status = self.instrument_service.universe_status()
         health = self.health_monitor.snapshot()
+        scanner_state = self.scanner_engine.refresh(reason="dashboard")
         return {
             "account_summary": account,
             "open_positions": positions,
@@ -65,6 +69,20 @@ class DashboardService:
             "market_data_candles": self.market_data_service.candles(limit=20),
             "market_data_events": self.market_data_service.events(limit=20),
             "market_data_heartbeat": self.market_data_service.heartbeat_snapshot(),
+            "scanner_summary": scanner_state["summary"],
+            "scanner_regime": scanner_state["regime"],
+            "scanner_intraday": scanner_state["intraday"],
+            "scanner_btst": scanner_state["btst"],
+            "scanner_swing": scanner_state["swing"],
+            "scanner_portfolio": scanner_state["portfolio"],
+            "scanner_options": scanner_state["options"],
+            "scanner_watchlist": scanner_state["watchlist"],
+            "scanner_avoid": scanner_state["avoid"],
+            "scanner_corporate_events": scanner_state["corporate_events"],
+            "scanner_sector_rotation": scanner_state["sector_rotation"],
+            "scanner_risk_heatmap": scanner_state["risk_heatmap"],
+            "scanner_top_gainers": scanner_state["top_gainers"],
+            "scanner_top_losers": scanner_state["top_losers"],
             "broker_readiness": health.get("brokers", {}),
             "audit_timeline": self.audit_repository.list_entries(limit=20),
             "health": health,

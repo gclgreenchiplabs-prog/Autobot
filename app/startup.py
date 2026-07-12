@@ -42,6 +42,7 @@ class ApplicationStartupManager:
         self.container.notification_service.start()
         self.container.instrument_service.start()
         self.container.market_data_service.start()
+        self.container.scanner_engine.refresh(reason="startup")
         self.container.broker_readiness_service.refresh()
         self.container.health_monitor.record_startup()
         self.container.scheduler.start()

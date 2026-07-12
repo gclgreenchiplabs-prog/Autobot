@@ -54,9 +54,18 @@ def build_candidates(
                 preferred_exchange=company_preference.get("preferred_exchange") or instrument["exchange"],
                 data_mode=quality.get("data_mode", "FIXTURE"),
                 eligible=eligible,
+                candidate_bucket="foundation",
+                decision="WATCH" if eligible else "AVOID",
+                risk_level="LOW" if eligible else "HIGH",
+                payload_json={
+                    "reason": selection_reasons[0] if selection_reasons else "",
+                    "quality_class": quality["quality_class"],
+                    "liquidity_class": liquidity["liquidity_class"],
+                },
                 rejection_reasons_json=rejection_reasons,
                 selection_reasons_json=[reason for reason in selection_reasons if reason],
                 created_at=created_at,
+                updated_at=created_at,
             ).to_dict()
         )
     return candidates

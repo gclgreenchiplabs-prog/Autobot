@@ -17,6 +17,11 @@ function formatMaybe(value) {
   return value;
 }
 
+function formatNumber(value) {
+  if (value === null || value === undefined || value === '') return 'N/A';
+  return Number(value).toLocaleString(undefined, { maximumFractionDigits: 2 });
+}
+
 function renderKeyValue(targetId, entries) {
   const target = document.getElementById(targetId);
   target.innerHTML = entries.map(([label, value]) => `
@@ -57,6 +62,58 @@ async function postAction(action) {
 
 function renderSummaryGrid(targetId, summary) {
   renderKeyValue(targetId, Object.entries(summary || {}).map(([key, value]) => [key.replace(/_/g, ' '), value]));
+}
+
+function renderScannerCandidates(targetId, items, emptyMessage) {
+  renderCards(
+    targetId,
+    items,
+    (candidate) => `
+      <article class="item-card">
+        <div class="item-head">
+          <strong>${candidate.symbol}</strong>
+          <span>${candidate.decision} | Score ${formatNumber(candidate.score)} | Confidence ${formatNumber(candidate.confidence)}</span>
+        </div>
+        <div class="item-grid">
+          <span>${candidate.exchange} | ${candidate.payload_json?.sector || 'N/A'}</span>
+          <span>${candidate.instrument_type} | ${candidate.strategy_scope}</span>
+          <span>Entry ${formatMoney(candidate.payload_json?.entry)}</span>
+          <span>SL ${formatMoney(candidate.payload_json?.sl)}</span>
+          <span>T1 ${formatMoney(candidate.payload_json?.t1)}</span>
+          <span>T2 ${formatMoney(candidate.payload_json?.t2)}</span>
+          <span>T3 ${formatMoney(candidate.payload_json?.t3)}</span>
+          <span>Stretch ${formatMoney(candidate.payload_json?.stretch_target)}</span>
+          <span>Risk ${candidate.risk_level}</span>
+          <span>Capital ${formatMoney(candidate.payload_json?.capital_required)}</span>
+        </div>
+        <p>${candidate.payload_json?.reason || 'No scanner reason available.'}</p>
+      </article>
+    `,
+    emptyMessage
+  );
+}
+
+function renderScannerProfiles(targetId, items, emptyMessage) {
+  renderCards(
+    targetId,
+    items,
+    (item) => `
+      <article class="item-card">
+        <div class="item-head">
+          <strong>${item.symbol || item.sector}</strong>
+          <span>${item.trend || item.label || item.classification || 'N/A'}</span>
+        </div>
+        <div class="item-grid">
+          <span>Change ${formatPct(item.change_pct)}</span>
+          <span>Price ${formatMoney(item.price)}</span>
+          <span>Risk ${formatNumber(item.risk_score)}</span>
+          <span>Confidence ${formatNumber(item.ai_confidence || item.confidence)}</span>
+        </div>
+        <p>${item.news_reason || item.corporate_reason || item.reason || 'No detail available.'}</p>
+      </article>
+    `,
+    emptyMessage
+  );
 }
 
 async function refreshState() {
@@ -138,6 +195,96 @@ async function refreshState() {
     ['Reconnect Count', formatMaybe(state.market_data_heartbeat?.reconnect_count)],
     ['Stale Instruments', formatMaybe(state.market_data_heartbeat?.stale_instrument_count)],
   ]);
+
+  renderKeyValue('scanner-summary', [
+    ['Regime', formatMaybe(state.scanner_summary?.market_regime)],
+    ['Intraday', formatMaybe(state.scanner_summary?.intraday_count)],
+    ['Options', formatMaybe(state.scanner_summary?.options_count)],
+    ['BTST', formatMaybe(state.scanner_summary?.btst_count)],
+    ['Swing', formatMaybe(state.scanner_summary?.swing_count)],
+    ['Portfolio', formatMaybe(state.scanner_summary?.portfolio_count)],
+    ['Watchlist', formatMaybe(state.scanner_summary?.watchlist_count)],
+    ['Avoid', formatMaybe(state.scanner_summary?.avoid_count)],
+    ['High Risk', formatMaybe(state.scanner_summary?.high_risk_count)],
+    ['Top Intraday', formatMaybe(state.scanner_summary?.top_intraday_symbol)],
+  ]);
+
+  renderCards(
+    'scanner-regime',
+    [state.scanner_regime || {}],
+    (regime) => `
+      <article class="item-card">
+        <div class="item-head">
+          <strong>${regime.regime || 'RANGE'}</strong>
+          <span>Score ${formatNumber(regime.score)}</span>
+        </div>
+        <p>${(regime.reasons || []).join(' | ') || 'No regime explanation available.'}</p>
+      </article>
+    `,
+    'No market regime summary.'
+  );
+
+  renderScannerCandidates('scanner-intraday', state.scanner_intraday, 'No intraday candidates.');
+  renderScannerCandidates('scanner-options', state.scanner_options, 'No option candidates.');
+  renderScannerCandidates('scanner-swing', state.scanner_swing, 'No swing candidates.');
+  renderScannerCandidates('scanner-portfolio', state.scanner_portfolio, 'No portfolio candidates.');
+  renderScannerCandidates('scanner-watchlist', state.scanner_watchlist, 'Watchlist is empty.');
+  renderScannerCandidates('scanner-avoid', state.scanner_avoid, 'Avoid list is empty.');
+
+  renderCards(
+    'scanner-corporate-events',
+    state.scanner_corporate_events,
+    (candidate) => `
+      <article class="item-card">
+        <div class="item-head">
+          <strong>${candidate.symbol}</strong>
+          <span>${candidate.payload_json?.corporate_risk || candidate.risk_level}</span>
+        </div>
+        <p>${candidate.payload_json?.reason || 'Corporate-event watchlist item.'}</p>
+      </article>
+    `,
+    'No corporate-event watchlist items.'
+  );
+
+  renderCards(
+    'scanner-sector-rotation',
+    state.scanner_sector_rotation,
+    (item) => `
+      <article class="item-card">
+        <div class="item-head">
+          <strong>${item.sector}</strong>
+          <span>${item.label}</span>
+        </div>
+        <div class="item-grid">
+          <span>Score ${formatNumber(item.score)}</span>
+          <span>Avg Change ${formatPct(item.avg_change_pct)}</span>
+          <span>Count ${formatMaybe(item.count)}</span>
+        </div>
+      </article>
+    `,
+    'No sector rotation data.'
+  );
+
+  renderCards(
+    'scanner-risk-heatmap',
+    state.scanner_risk_heatmap,
+    (item) => `
+      <article class="item-card">
+        <div class="item-head">
+          <strong>${item.sector}</strong>
+          <span>${item.classification}</span>
+        </div>
+        <div class="item-grid">
+          <span>Risk ${formatNumber(item.risk_score)}</span>
+          <span>Confidence ${formatNumber(item.confidence)}</span>
+        </div>
+      </article>
+    `,
+    'No risk heatmap data.'
+  );
+
+  renderScannerProfiles('scanner-top-gainers', state.scanner_top_gainers, 'No top gainers.');
+  renderScannerProfiles('scanner-top-losers', state.scanner_top_losers, 'No top losers.');
 
   renderCards(
     'broker-readiness',

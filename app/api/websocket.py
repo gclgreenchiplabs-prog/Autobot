@@ -17,6 +17,7 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
                 or {"status": "initialized", "mode": container.settings.trading_mode, "kill_switch": False},
                 "events": container.event_bus.list_events(),
                 "market_data_status": container.state_store.get("market_data_status") or {},
+                "scanner_summary": (container.state_store.get("scanner_state") or {}).get("summary", {}),
                 "quote_update": (container.state_store.get("market_data_quotes") or [])[:10],
                 "candle_update": (container.state_store.get("market_data_candles") or [])[:10],
                 "subscription_update": container.state_store.get("market_data_subscriptions") or [],

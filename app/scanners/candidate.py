@@ -22,9 +22,14 @@ class CandidateRecord:
     preferred_exchange: str
     data_mode: str
     eligible: bool
+    candidate_bucket: str = "general"
+    decision: str = "WATCH"
+    risk_level: str = "MEDIUM"
+    payload_json: Dict[str, Any] = field(default_factory=dict)
     rejection_reasons_json: List[str] = field(default_factory=list)
     selection_reasons_json: List[str] = field(default_factory=list)
     created_at: str = ""
+    updated_at: str = ""
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
