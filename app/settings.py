@@ -45,6 +45,46 @@ class Settings:
     telegram_timeout_seconds: int = 10
     telegram_max_retries: int = 3
     notification_retention_days: int = 0
+    enable_nse: bool = True
+    enable_bse: bool = True
+    enable_fno: bool = True
+    instrument_import_source: str = "FIXTURE"
+    instrument_import_path: str = ""
+    instrument_master_max_age_hours: int = 24
+    broker_mapping_max_age_hours: int = 24
+    quote_fresh_seconds: int = 10
+    quote_aging_seconds: int = 30
+    max_quote_age_seconds: int = 60
+    min_intraday_traded_value: float = 10_000_000.0
+    min_btst_traded_value: float = 5_000_000.0
+    min_swing_traded_value: float = 1_000_000.0
+    max_allowed_spread_pct: float = 0.50
+    min_option_oi: int = 1000
+    min_option_volume: int = 100
+    enable_market_data: bool = True
+    market_data_mode: str = "FIXTURE"
+    primary_market_data_broker: str = "fyers"
+    standby_market_data_broker: str = "dhan"
+    enable_market_data_failover: bool = False
+    fyers_market_data_enable: bool = False
+    dhan_market_data_enable: bool = False
+    market_data_heartbeat_seconds: int = 5
+    market_data_stale_seconds: int = 15
+    market_data_failed_seconds: int = 60
+    market_data_reconnect_initial_seconds: int = 2
+    market_data_reconnect_max_seconds: int = 60
+    market_data_max_reconnect_attempts: int = 10
+    market_data_reconnect_jitter_seconds: float = 0.0
+    market_tick_retention_days: int = 0
+    market_candle_retention_days: int = 0
+    enable_1m_candles: bool = True
+    enable_5m_candles: bool = True
+    enable_15m_candles: bool = True
+    enable_30m_candles: bool = True
+    enable_daily_candles: bool = True
+    fixture_market_data_path: str = ""
+    fixture_tick_interval_ms: int = 1000
+    fixture_auto_start: bool = False
 
     @property
     def is_paper_mode(self) -> bool:
@@ -92,6 +132,46 @@ def load_settings(env_path: Optional[os.PathLike[str] | str | Path] = None) -> S
         telegram_timeout_seconds=int(merged.get("TELEGRAM_TIMEOUT_SECONDS") or 10),
         telegram_max_retries=int(merged.get("TELEGRAM_MAX_RETRIES") or 3),
         notification_retention_days=int(merged.get("NOTIFICATION_RETENTION_DAYS") or 0),
+        enable_nse=str(merged.get("ENABLE_NSE") or "true").strip().lower() in {"1", "true", "yes", "on"},
+        enable_bse=str(merged.get("ENABLE_BSE") or "true").strip().lower() in {"1", "true", "yes", "on"},
+        enable_fno=str(merged.get("ENABLE_FNO") or "true").strip().lower() in {"1", "true", "yes", "on"},
+        instrument_import_source=(merged.get("INSTRUMENT_IMPORT_SOURCE") or "FIXTURE").strip().upper(),
+        instrument_import_path=(merged.get("INSTRUMENT_IMPORT_PATH") or "").strip(),
+        instrument_master_max_age_hours=int(merged.get("INSTRUMENT_MASTER_MAX_AGE_HOURS") or 24),
+        broker_mapping_max_age_hours=int(merged.get("BROKER_MAPPING_MAX_AGE_HOURS") or 24),
+        quote_fresh_seconds=int(merged.get("QUOTE_FRESH_SECONDS") or 10),
+        quote_aging_seconds=int(merged.get("QUOTE_AGING_SECONDS") or 30),
+        max_quote_age_seconds=int(merged.get("MAX_QUOTE_AGE_SECONDS") or 60),
+        min_intraday_traded_value=float(merged.get("MIN_INTRADAY_TRADED_VALUE") or 10_000_000.0),
+        min_btst_traded_value=float(merged.get("MIN_BTST_TRADED_VALUE") or 5_000_000.0),
+        min_swing_traded_value=float(merged.get("MIN_SWING_TRADED_VALUE") or 1_000_000.0),
+        max_allowed_spread_pct=float(merged.get("MAX_ALLOWED_SPREAD_PCT") or 0.50),
+        min_option_oi=int(merged.get("MIN_OPTION_OI") or 1000),
+        min_option_volume=int(merged.get("MIN_OPTION_VOLUME") or 100),
+        enable_market_data=str(merged.get("ENABLE_MARKET_DATA") or "true").strip().lower() in {"1", "true", "yes", "on"},
+        market_data_mode=(merged.get("MARKET_DATA_MODE") or "FIXTURE").strip().upper(),
+        primary_market_data_broker=(merged.get("PRIMARY_MARKET_DATA_BROKER") or "FYERS").strip().lower(),
+        standby_market_data_broker=(merged.get("STANDBY_MARKET_DATA_BROKER") or "DHAN").strip().lower(),
+        enable_market_data_failover=str(merged.get("ENABLE_MARKET_DATA_FAILOVER") or "false").strip().lower() in {"1", "true", "yes", "on"},
+        fyers_market_data_enable=str(merged.get("FYERS_MARKET_DATA_ENABLE") or "false").strip().lower() in {"1", "true", "yes", "on"},
+        dhan_market_data_enable=str(merged.get("DHAN_MARKET_DATA_ENABLE") or "false").strip().lower() in {"1", "true", "yes", "on"},
+        market_data_heartbeat_seconds=int(merged.get("MARKET_DATA_HEARTBEAT_SECONDS") or 5),
+        market_data_stale_seconds=int(merged.get("MARKET_DATA_STALE_SECONDS") or 15),
+        market_data_failed_seconds=int(merged.get("MARKET_DATA_FAILED_SECONDS") or 60),
+        market_data_reconnect_initial_seconds=int(merged.get("MARKET_DATA_RECONNECT_INITIAL_SECONDS") or 2),
+        market_data_reconnect_max_seconds=int(merged.get("MARKET_DATA_RECONNECT_MAX_SECONDS") or 60),
+        market_data_max_reconnect_attempts=int(merged.get("MARKET_DATA_MAX_RECONNECT_ATTEMPTS") or 10),
+        market_data_reconnect_jitter_seconds=float(merged.get("MARKET_DATA_RECONNECT_JITTER_SECONDS") or 0.0),
+        market_tick_retention_days=int(merged.get("MARKET_TICK_RETENTION_DAYS") or 0),
+        market_candle_retention_days=int(merged.get("MARKET_CANDLE_RETENTION_DAYS") or 0),
+        enable_1m_candles=str(merged.get("ENABLE_1M_CANDLES") or "true").strip().lower() in {"1", "true", "yes", "on"},
+        enable_5m_candles=str(merged.get("ENABLE_5M_CANDLES") or "true").strip().lower() in {"1", "true", "yes", "on"},
+        enable_15m_candles=str(merged.get("ENABLE_15M_CANDLES") or "true").strip().lower() in {"1", "true", "yes", "on"},
+        enable_30m_candles=str(merged.get("ENABLE_30M_CANDLES") or "true").strip().lower() in {"1", "true", "yes", "on"},
+        enable_daily_candles=str(merged.get("ENABLE_DAILY_CANDLES") or "true").strip().lower() in {"1", "true", "yes", "on"},
+        fixture_market_data_path=(merged.get("FIXTURE_MARKET_DATA_PATH") or "").strip(),
+        fixture_tick_interval_ms=int(merged.get("FIXTURE_TICK_INTERVAL_MS") or 1000),
+        fixture_auto_start=str(merged.get("FIXTURE_AUTO_START") or "false").strip().lower() in {"1", "true", "yes", "on"},
     )
 
 
@@ -122,3 +202,43 @@ def validate_settings(settings: Settings) -> None:
         raise SettingsValidationError("invalid notification interval or recent-closed window")
     if settings.telegram_timeout_seconds <= 0 or settings.telegram_max_retries <= 0:
         raise SettingsValidationError("invalid telegram timeout or retry configuration")
+    if settings.instrument_master_max_age_hours <= 0 or settings.broker_mapping_max_age_hours <= 0:
+        raise SettingsValidationError("invalid instrument master or broker mapping max age")
+    if settings.quote_fresh_seconds <= 0 or settings.quote_aging_seconds <= 0 or settings.max_quote_age_seconds <= 0:
+        raise SettingsValidationError("invalid quote freshness configuration")
+    if settings.quote_fresh_seconds >= settings.quote_aging_seconds or settings.quote_aging_seconds >= settings.max_quote_age_seconds:
+        raise SettingsValidationError("quote freshness thresholds must increase strictly")
+    if settings.min_intraday_traded_value <= 0 or settings.min_btst_traded_value <= 0 or settings.min_swing_traded_value <= 0:
+        raise SettingsValidationError("invalid traded-value threshold")
+    if settings.max_allowed_spread_pct <= 0:
+        raise SettingsValidationError("invalid spread threshold")
+    if settings.min_option_oi < 0 or settings.min_option_volume < 0:
+        raise SettingsValidationError("invalid option liquidity threshold")
+    if settings.market_data_mode not in {"FIXTURE", "LIVE", "DELAYED", "HISTORICAL"}:
+        raise SettingsValidationError("invalid market data mode")
+    if settings.primary_market_data_broker not in {"fyers", "dhan"} or settings.standby_market_data_broker not in {"fyers", "dhan"}:
+        raise SettingsValidationError("unsupported market-data broker")
+    if settings.market_data_heartbeat_seconds <= 0 or settings.market_data_stale_seconds <= 0 or settings.market_data_failed_seconds <= 0:
+        raise SettingsValidationError("invalid market-data timing configuration")
+    if settings.market_data_heartbeat_seconds >= settings.market_data_stale_seconds or settings.market_data_stale_seconds >= settings.market_data_failed_seconds:
+        raise SettingsValidationError("market-data thresholds must increase strictly")
+    if settings.market_data_reconnect_initial_seconds <= 0 or settings.market_data_reconnect_max_seconds <= 0:
+        raise SettingsValidationError("invalid market-data reconnect configuration")
+    if settings.market_data_reconnect_initial_seconds > settings.market_data_reconnect_max_seconds:
+        raise SettingsValidationError("market-data reconnect initial delay cannot exceed max delay")
+    if settings.market_data_max_reconnect_attempts < 0 or settings.market_data_reconnect_jitter_seconds < 0:
+        raise SettingsValidationError("invalid market-data retry configuration")
+    if settings.market_tick_retention_days < 0 or settings.market_candle_retention_days < 0:
+        raise SettingsValidationError("invalid market-data retention configuration")
+    if settings.fixture_tick_interval_ms <= 0:
+        raise SettingsValidationError("invalid fixture tick interval")
+    if not any(
+        [
+            settings.enable_1m_candles,
+            settings.enable_5m_candles,
+            settings.enable_15m_candles,
+            settings.enable_30m_candles,
+            settings.enable_daily_candles,
+        ]
+    ):
+        raise SettingsValidationError("at least one candle timeframe must be enabled")
