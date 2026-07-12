@@ -17,10 +17,25 @@ class Settings:
     primary_broker: str = "fyers"
     standby_broker: str = "dhan"
     trading_mode: str = "paper"
+    execution_broker: str = "fyers"
+    option_chain_broker: str = "dhan"
     api_key: str = ""
     api_secret: str = ""
     access_token: str = ""
     broker_pin: str = ""
+    fyers_configured: bool = False
+    fyers_client_id: str = ""
+    fyers_secret_key: str = ""
+    fyers_redirect_uri: str = ""
+    fyers_access_token: str = ""
+    fyers_execution_enable: bool = False
+    dhan_configured: bool = False
+    dhan_client_id: str = ""
+    dhan_access_token: str = ""
+    dhan_execution_enable: bool = False
+    dhan_option_chain_enable: bool = False
+    dhan_static_ip_ready: bool = False
+    dhan_order_api_enable: bool = False
     database_path: str = "data/market_move.db"
     log_level: str = "INFO"
     log_max_bytes: int = 5_242_880
@@ -61,11 +76,16 @@ class Settings:
     max_allowed_spread_pct: float = 0.50
     min_option_oi: int = 1000
     min_option_volume: int = 100
+    live_order_enable: bool = False
+    live_market_data_enable: bool = False
+    explicit_live_confirmation: bool = False
     enable_market_data: bool = True
     market_data_mode: str = "FIXTURE"
     primary_market_data_broker: str = "fyers"
     standby_market_data_broker: str = "dhan"
     enable_market_data_failover: bool = False
+    enable_execution_failover: bool = False
+    failover_requires_manual_approval: bool = True
     fyers_market_data_enable: bool = False
     dhan_market_data_enable: bool = False
     market_data_heartbeat_seconds: int = 5
@@ -100,78 +120,108 @@ def load_settings(env_path: Optional[os.PathLike[str] | str | Path] = None) -> S
 
     merged = {**os.environ, **values}
 
+    def _value(*keys: str, default: str = "") -> str:
+        for key in keys:
+            value = merged.get(key)
+            if value is not None and str(value).strip() != "":
+                return str(value)
+        return default
+
+    def _bool(*keys: str, default: str = "false") -> bool:
+        return _value(*keys, default=default).strip().lower() in {"1", "true", "yes", "on"}
+
     return Settings(
-        primary_broker=(merged.get("PRIMARY_BROKER") or "fyers").strip().lower(),
-        standby_broker=(merged.get("STANDBY_BROKER") or "dhan").strip().lower(),
-        trading_mode=(merged.get("TRADING_MODE") or "paper").strip().lower(),
-        api_key=(merged.get("BROKER_API_KEY") or "").strip(),
-        api_secret=(merged.get("BROKER_SECRET_KEY") or "").strip(),
-        access_token=(merged.get("BROKER_ACCESS_TOKEN") or "").strip(),
-        broker_pin=(merged.get("BROKER_PIN") or "").strip(),
-        database_path=(merged.get("DATABASE_PATH") or "data/market_move.db").strip(),
-        log_level=(merged.get("LOG_LEVEL") or "INFO").strip().upper(),
-        log_max_bytes=int(merged.get("LOG_MAX_BYTES") or 5_242_880),
-        log_backup_count=int(merged.get("LOG_BACKUP_COUNT") or 5),
-        timezone=(merged.get("TIMEZONE") or "Asia/Kolkata").strip(),
-        premarket_start_time=(merged.get("PREMARKET_START_TIME") or "08:45").strip(),
-        market_open_time=(merged.get("MARKET_OPEN_TIME") or "09:15").strip(),
-        market_close_time=(merged.get("MARKET_CLOSE_TIME") or "15:30").strip(),
-        post_market_end_time=(merged.get("POST_MARKET_END_TIME") or "18:00").strip(),
-        forced_test_mode=str(merged.get("FORCED_TEST_MODE") or "false").strip().lower() in {"1", "true", "yes", "on"},
-        holiday_calendar_path=(merged.get("HOLIDAY_CALENDAR_PATH") or "").strip(),
-        opening_capital=float(merged.get("OPENING_CAPITAL") or 500_000.0),
-        enable_notifications=str(merged.get("ENABLE_NOTIFICATIONS") or "true").strip().lower() in {"1", "true", "yes", "on"},
-        status_notification_interval_minutes=int(merged.get("STATUS_NOTIFICATION_INTERVAL_MINUTES") or 5),
-        status_send_unchanged=str(merged.get("STATUS_SEND_UNCHANGED") or "true").strip().lower() in {"1", "true", "yes", "on"},
-        status_include_recent_closed=str(merged.get("STATUS_INCLUDE_RECENT_CLOSED") or "true").strip().lower() in {"1", "true", "yes", "on"},
-        status_recent_closed_window_minutes=int(merged.get("STATUS_RECENT_CLOSED_WINDOW_MINUTES") or 10),
-        enable_telegram=str(merged.get("ENABLE_TELEGRAM") or "false").strip().lower() in {"1", "true", "yes", "on"},
-        telegram_bot_token=(merged.get("TELEGRAM_BOT_TOKEN") or "").strip(),
-        telegram_chat_id=(merged.get("TELEGRAM_CHAT_ID") or "").strip(),
-        telegram_parse_mode=(merged.get("TELEGRAM_PARSE_MODE") or "HTML").strip().upper(),
-        telegram_timeout_seconds=int(merged.get("TELEGRAM_TIMEOUT_SECONDS") or 10),
-        telegram_max_retries=int(merged.get("TELEGRAM_MAX_RETRIES") or 3),
-        notification_retention_days=int(merged.get("NOTIFICATION_RETENTION_DAYS") or 0),
-        enable_nse=str(merged.get("ENABLE_NSE") or "true").strip().lower() in {"1", "true", "yes", "on"},
-        enable_bse=str(merged.get("ENABLE_BSE") or "true").strip().lower() in {"1", "true", "yes", "on"},
-        enable_fno=str(merged.get("ENABLE_FNO") or "true").strip().lower() in {"1", "true", "yes", "on"},
-        instrument_import_source=(merged.get("INSTRUMENT_IMPORT_SOURCE") or "FIXTURE").strip().upper(),
-        instrument_import_path=(merged.get("INSTRUMENT_IMPORT_PATH") or "").strip(),
-        instrument_master_max_age_hours=int(merged.get("INSTRUMENT_MASTER_MAX_AGE_HOURS") or 24),
-        broker_mapping_max_age_hours=int(merged.get("BROKER_MAPPING_MAX_AGE_HOURS") or 24),
-        quote_fresh_seconds=int(merged.get("QUOTE_FRESH_SECONDS") or 10),
-        quote_aging_seconds=int(merged.get("QUOTE_AGING_SECONDS") or 30),
-        max_quote_age_seconds=int(merged.get("MAX_QUOTE_AGE_SECONDS") or 60),
-        min_intraday_traded_value=float(merged.get("MIN_INTRADAY_TRADED_VALUE") or 10_000_000.0),
-        min_btst_traded_value=float(merged.get("MIN_BTST_TRADED_VALUE") or 5_000_000.0),
-        min_swing_traded_value=float(merged.get("MIN_SWING_TRADED_VALUE") or 1_000_000.0),
-        max_allowed_spread_pct=float(merged.get("MAX_ALLOWED_SPREAD_PCT") or 0.50),
-        min_option_oi=int(merged.get("MIN_OPTION_OI") or 1000),
-        min_option_volume=int(merged.get("MIN_OPTION_VOLUME") or 100),
-        enable_market_data=str(merged.get("ENABLE_MARKET_DATA") or "true").strip().lower() in {"1", "true", "yes", "on"},
-        market_data_mode=(merged.get("MARKET_DATA_MODE") or "FIXTURE").strip().upper(),
-        primary_market_data_broker=(merged.get("PRIMARY_MARKET_DATA_BROKER") or "FYERS").strip().lower(),
-        standby_market_data_broker=(merged.get("STANDBY_MARKET_DATA_BROKER") or "DHAN").strip().lower(),
-        enable_market_data_failover=str(merged.get("ENABLE_MARKET_DATA_FAILOVER") or "false").strip().lower() in {"1", "true", "yes", "on"},
-        fyers_market_data_enable=str(merged.get("FYERS_MARKET_DATA_ENABLE") or "false").strip().lower() in {"1", "true", "yes", "on"},
-        dhan_market_data_enable=str(merged.get("DHAN_MARKET_DATA_ENABLE") or "false").strip().lower() in {"1", "true", "yes", "on"},
-        market_data_heartbeat_seconds=int(merged.get("MARKET_DATA_HEARTBEAT_SECONDS") or 5),
-        market_data_stale_seconds=int(merged.get("MARKET_DATA_STALE_SECONDS") or 15),
-        market_data_failed_seconds=int(merged.get("MARKET_DATA_FAILED_SECONDS") or 60),
-        market_data_reconnect_initial_seconds=int(merged.get("MARKET_DATA_RECONNECT_INITIAL_SECONDS") or 2),
-        market_data_reconnect_max_seconds=int(merged.get("MARKET_DATA_RECONNECT_MAX_SECONDS") or 60),
-        market_data_max_reconnect_attempts=int(merged.get("MARKET_DATA_MAX_RECONNECT_ATTEMPTS") or 10),
-        market_data_reconnect_jitter_seconds=float(merged.get("MARKET_DATA_RECONNECT_JITTER_SECONDS") or 0.0),
-        market_tick_retention_days=int(merged.get("MARKET_TICK_RETENTION_DAYS") or 0),
-        market_candle_retention_days=int(merged.get("MARKET_CANDLE_RETENTION_DAYS") or 0),
-        enable_1m_candles=str(merged.get("ENABLE_1M_CANDLES") or "true").strip().lower() in {"1", "true", "yes", "on"},
-        enable_5m_candles=str(merged.get("ENABLE_5M_CANDLES") or "true").strip().lower() in {"1", "true", "yes", "on"},
-        enable_15m_candles=str(merged.get("ENABLE_15M_CANDLES") or "true").strip().lower() in {"1", "true", "yes", "on"},
-        enable_30m_candles=str(merged.get("ENABLE_30M_CANDLES") or "true").strip().lower() in {"1", "true", "yes", "on"},
-        enable_daily_candles=str(merged.get("ENABLE_DAILY_CANDLES") or "true").strip().lower() in {"1", "true", "yes", "on"},
-        fixture_market_data_path=(merged.get("FIXTURE_MARKET_DATA_PATH") or "").strip(),
-        fixture_tick_interval_ms=int(merged.get("FIXTURE_TICK_INTERVAL_MS") or 1000),
-        fixture_auto_start=str(merged.get("FIXTURE_AUTO_START") or "false").strip().lower() in {"1", "true", "yes", "on"},
+        primary_broker=_value("PRIMARY_BROKER", default="fyers").strip().lower(),
+        standby_broker=_value("STANDBY_BROKER", default="dhan").strip().lower(),
+        trading_mode=_value("EXECUTION_MODE", "TRADING_MODE", default="paper").strip().lower(),
+        execution_broker=_value("EXECUTION_BROKER", "PRIMARY_BROKER", default="fyers").strip().lower(),
+        option_chain_broker=_value("OPTION_CHAIN_BROKER", "STANDBY_MARKET_DATA_BROKER", default="dhan").strip().lower(),
+        api_key=_value("BROKER_API_KEY", "FYERS_CLIENT_ID").strip(),
+        api_secret=_value("BROKER_SECRET_KEY", "FYERS_SECRET_KEY").strip(),
+        access_token=_value("BROKER_ACCESS_TOKEN", "FYERS_ACCESS_TOKEN").strip(),
+        broker_pin=_value("BROKER_PIN").strip(),
+        fyers_configured=_bool("FYERS_CONFIGURED"),
+        fyers_client_id=_value("FYERS_CLIENT_ID").strip(),
+        fyers_secret_key=_value("FYERS_SECRET_KEY").strip(),
+        fyers_redirect_uri=_value("FYERS_REDIRECT_URI").strip(),
+        fyers_access_token=_value("FYERS_ACCESS_TOKEN").strip(),
+        fyers_execution_enable=_bool("FYERS_EXECUTION_ENABLE"),
+        dhan_configured=_bool("DHAN_CONFIGURED"),
+        dhan_client_id=_value("DHAN_CLIENT_ID").strip(),
+        dhan_access_token=_value("DHAN_ACCESS_TOKEN").strip(),
+        dhan_execution_enable=_bool("DHAN_EXECUTION_ENABLE"),
+        dhan_option_chain_enable=_bool("DHAN_OPTION_CHAIN_ENABLE"),
+        dhan_static_ip_ready=_bool("DHAN_STATIC_IP_READY"),
+        dhan_order_api_enable=_bool("DHAN_ORDER_API_ENABLE"),
+        database_path=_value("DATABASE_PATH", default="data/market_move.db").strip(),
+        log_level=_value("LOG_LEVEL", default="INFO").strip().upper(),
+        log_max_bytes=int(_value("LOG_MAX_BYTES", default="5242880")),
+        log_backup_count=int(_value("LOG_BACKUP_COUNT", default="5")),
+        timezone=_value("TIMEZONE", default="Asia/Kolkata").strip(),
+        premarket_start_time=_value("PREMARKET_START_TIME", default="08:45").strip(),
+        market_open_time=_value("MARKET_OPEN_TIME", default="09:15").strip(),
+        market_close_time=_value("MARKET_CLOSE_TIME", default="15:30").strip(),
+        post_market_end_time=_value("POST_MARKET_END_TIME", default="18:00").strip(),
+        forced_test_mode=_bool("FORCED_TEST_MODE"),
+        holiday_calendar_path=_value("HOLIDAY_CALENDAR_PATH").strip(),
+        opening_capital=float(_value("OPENING_CAPITAL", default="500000")),
+        enable_notifications=_bool("ENABLE_NOTIFICATIONS", default="true"),
+        status_notification_interval_minutes=int(_value("STATUS_NOTIFICATION_INTERVAL_MINUTES", default="5")),
+        status_send_unchanged=_bool("STATUS_SEND_UNCHANGED", default="true"),
+        status_include_recent_closed=_bool("STATUS_INCLUDE_RECENT_CLOSED", default="true"),
+        status_recent_closed_window_minutes=int(_value("STATUS_RECENT_CLOSED_WINDOW_MINUTES", default="10")),
+        enable_telegram=_bool("ENABLE_TELEGRAM"),
+        telegram_bot_token=_value("TELEGRAM_BOT_TOKEN").strip(),
+        telegram_chat_id=_value("TELEGRAM_CHAT_ID").strip(),
+        telegram_parse_mode=_value("TELEGRAM_PARSE_MODE", default="HTML").strip().upper(),
+        telegram_timeout_seconds=int(_value("TELEGRAM_TIMEOUT_SECONDS", default="10")),
+        telegram_max_retries=int(_value("TELEGRAM_MAX_RETRIES", default="3")),
+        notification_retention_days=int(_value("NOTIFICATION_RETENTION_DAYS", default="0")),
+        enable_nse=_bool("ENABLE_NSE", default="true"),
+        enable_bse=_bool("ENABLE_BSE", default="true"),
+        enable_fno=_bool("ENABLE_FNO", default="true"),
+        instrument_import_source=_value("INSTRUMENT_IMPORT_SOURCE", default="FIXTURE").strip().upper(),
+        instrument_import_path=_value("INSTRUMENT_IMPORT_PATH").strip(),
+        instrument_master_max_age_hours=int(_value("INSTRUMENT_MASTER_MAX_AGE_HOURS", default="24")),
+        broker_mapping_max_age_hours=int(_value("BROKER_MAPPING_MAX_AGE_HOURS", default="24")),
+        quote_fresh_seconds=int(_value("QUOTE_FRESH_SECONDS", default="10")),
+        quote_aging_seconds=int(_value("QUOTE_AGING_SECONDS", default="30")),
+        max_quote_age_seconds=int(_value("MAX_QUOTE_AGE_SECONDS", default="60")),
+        min_intraday_traded_value=float(_value("MIN_INTRADAY_TRADED_VALUE", default="10000000")),
+        min_btst_traded_value=float(_value("MIN_BTST_TRADED_VALUE", default="5000000")),
+        min_swing_traded_value=float(_value("MIN_SWING_TRADED_VALUE", default="1000000")),
+        max_allowed_spread_pct=float(_value("MAX_ALLOWED_SPREAD_PCT", default="0.50")),
+        min_option_oi=int(_value("MIN_OPTION_OI", default="1000")),
+        min_option_volume=int(_value("MIN_OPTION_VOLUME", default="100")),
+        live_order_enable=_bool("LIVE_ORDER_ENABLE"),
+        live_market_data_enable=_bool("LIVE_MARKET_DATA_ENABLE"),
+        explicit_live_confirmation=_bool("EXPLICIT_LIVE_CONFIRMATION"),
+        enable_market_data=_bool("ENABLE_MARKET_DATA", default="true"),
+        market_data_mode=_value("MARKET_DATA_MODE", default="FIXTURE").strip().upper(),
+        primary_market_data_broker=_value("PRIMARY_MARKET_DATA_BROKER", default="FYERS").strip().lower(),
+        standby_market_data_broker=_value("STANDBY_MARKET_DATA_BROKER", default="DHAN").strip().lower(),
+        enable_market_data_failover=_bool("ENABLE_MARKET_DATA_FAILOVER"),
+        enable_execution_failover=_bool("ENABLE_EXECUTION_FAILOVER"),
+        failover_requires_manual_approval=_bool("FAILOVER_REQUIRES_MANUAL_APPROVAL", default="true"),
+        fyers_market_data_enable=_bool("FYERS_MARKET_DATA_ENABLE"),
+        dhan_market_data_enable=_bool("DHAN_MARKET_DATA_ENABLE"),
+        market_data_heartbeat_seconds=int(_value("MARKET_DATA_HEARTBEAT_SECONDS", default="5")),
+        market_data_stale_seconds=int(_value("MARKET_DATA_STALE_SECONDS", default="15")),
+        market_data_failed_seconds=int(_value("MARKET_DATA_FAILED_SECONDS", default="60")),
+        market_data_reconnect_initial_seconds=int(_value("MARKET_DATA_RECONNECT_INITIAL_SECONDS", default="2")),
+        market_data_reconnect_max_seconds=int(_value("MARKET_DATA_RECONNECT_MAX_SECONDS", default="60")),
+        market_data_max_reconnect_attempts=int(_value("MARKET_DATA_MAX_RECONNECT_ATTEMPTS", default="10")),
+        market_data_reconnect_jitter_seconds=float(_value("MARKET_DATA_RECONNECT_JITTER_SECONDS", default="0.0")),
+        market_tick_retention_days=int(_value("MARKET_TICK_RETENTION_DAYS", default="0")),
+        market_candle_retention_days=int(_value("MARKET_CANDLE_RETENTION_DAYS", default="0")),
+        enable_1m_candles=_bool("ENABLE_1M_CANDLES", default="true"),
+        enable_5m_candles=_bool("ENABLE_5M_CANDLES", default="true"),
+        enable_15m_candles=_bool("ENABLE_15M_CANDLES", default="true"),
+        enable_30m_candles=_bool("ENABLE_30M_CANDLES", default="true"),
+        enable_daily_candles=_bool("ENABLE_DAILY_CANDLES", default="true"),
+        fixture_market_data_path=_value("FIXTURE_MARKET_DATA_PATH").strip(),
+        fixture_tick_interval_ms=int(_value("FIXTURE_TICK_INTERVAL_MS", default="1000")),
+        fixture_auto_start=_bool("FIXTURE_AUTO_START"),
     )
 
 
@@ -218,6 +268,14 @@ def validate_settings(settings: Settings) -> None:
         raise SettingsValidationError("invalid market data mode")
     if settings.primary_market_data_broker not in {"fyers", "dhan"} or settings.standby_market_data_broker not in {"fyers", "dhan"}:
         raise SettingsValidationError("unsupported market-data broker")
+    if settings.primary_broker not in {"fyers", "dhan"} or settings.standby_broker not in {"fyers", "dhan"} or settings.execution_broker not in {"fyers", "dhan"}:
+        raise SettingsValidationError("unsupported execution broker")
+    if settings.option_chain_broker not in {"fyers", "dhan"}:
+        raise SettingsValidationError("unsupported option-chain broker")
+    if settings.is_paper_mode and settings.live_order_enable:
+        raise SettingsValidationError("live orders cannot be enabled in paper mode")
+    if settings.market_data_mode != "LIVE" and settings.live_market_data_enable:
+        raise SettingsValidationError("live market-data enable requires MARKET_DATA_MODE=LIVE")
     if settings.market_data_heartbeat_seconds <= 0 or settings.market_data_stale_seconds <= 0 or settings.market_data_failed_seconds <= 0:
         raise SettingsValidationError("invalid market-data timing configuration")
     if settings.market_data_heartbeat_seconds >= settings.market_data_stale_seconds or settings.market_data_stale_seconds >= settings.market_data_failed_seconds:

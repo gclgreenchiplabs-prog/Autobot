@@ -32,3 +32,36 @@ def test_settings_reads_values_from_env_file(tmp_path: Path):
     assert settings.standby_broker == "fyers"
     assert settings.trading_mode == "live"
     assert settings.is_paper_mode is False
+
+
+def test_settings_supports_execution_mode_and_broker_specific_aliases(tmp_path: Path):
+    env_file = tmp_path / "aliases.env"
+    env_file.write_text(
+        "EXECUTION_MODE=PAPER\n"
+        "EXECUTION_BROKER=FYERS\n"
+        "OPTION_CHAIN_BROKER=DHAN\n"
+        "FYERS_CLIENT_ID=fyers-id\n"
+        "FYERS_SECRET_KEY=fyers-secret\n"
+        "FYERS_ACCESS_TOKEN=fyers-token\n"
+        "DHAN_CLIENT_ID=dhan-id\n"
+        "DHAN_ACCESS_TOKEN=dhan-token\n"
+        "LIVE_ORDER_ENABLE=false\n"
+        "LIVE_MARKET_DATA_ENABLE=false\n"
+        "PRIMARY_MARKET_DATA_BROKER=FYERS\n"
+        "STANDBY_MARKET_DATA_BROKER=DHAN\n",
+        encoding="utf-8",
+    )
+
+    settings = load_settings(env_path=env_file)
+
+    assert settings.trading_mode == "paper"
+    assert settings.execution_broker == "fyers"
+    assert settings.option_chain_broker == "dhan"
+    assert settings.fyers_client_id == "fyers-id"
+    assert settings.api_key == "fyers-id"
+    assert settings.fyers_secret_key == "fyers-secret"
+    assert settings.api_secret == "fyers-secret"
+    assert settings.fyers_access_token == "fyers-token"
+    assert settings.access_token == "fyers-token"
+    assert settings.dhan_client_id == "dhan-id"
+    assert settings.dhan_access_token == "dhan-token"
